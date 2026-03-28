@@ -1,2 +1,1 @@
-# course-platform
-Online course and blog platform
+# Course Platform
