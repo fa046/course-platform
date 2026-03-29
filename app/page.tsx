@@ -94,7 +94,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#F8F9FF] text-[#0F1F3D] overflow-x-hidden">
 
-      {/* Navigation */}
+      {/* Navigation
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#0F1F3D]/8 bg-[#F8F9FF]/95 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -117,7 +117,7 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-      </nav>
+      </nav> */}
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-24 px-6">
