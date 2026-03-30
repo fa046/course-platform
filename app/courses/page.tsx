@@ -20,19 +20,21 @@ export default function CoursesPage() {
   }, [showFreeOnly])
 
   async function fetchCourses() {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (showFreeOnly) params.set('free', 'true')
-      const res = await fetch(`/api/courses?${params}`)
-      const data = await res.json()
-      setCourses(data.courses || [])
-    } catch (error) {
-      console.error('Failed to fetch courses:', error)
-    } finally {
-      setLoading(false)
-    }
+  setLoading(true)
+  try {
+    const params = new URLSearchParams()
+    if (showFreeOnly) params.set('free', 'true')
+    const res = await fetch(`/api/courses?${params}`)
+    if (!res.ok) throw new Error('API error')
+    const data = await res.json()
+    setCourses(data.courses || [])
+  } catch (error) {
+    console.error('Failed to fetch courses:', error)
+    setCourses([])
+  } finally {
+    setLoading(false)
   }
+}
 
   const filtered = courses.filter(course => {
     const matchSearch = course.title.toLowerCase().includes(search.toLowerCase())
