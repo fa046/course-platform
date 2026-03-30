@@ -1,18 +1,20 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category')
     const free = searchParams.get('free')
     const search = searchParams.get('search')
 
-    const supabase = await createClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
     let query = supabase
       .from('courses')
-      .select('*, lessons(count)')
+      .select('*')
       .eq('is_published', true)
       .order('created_at', { ascending: false })
 
@@ -30,6 +32,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ courses: data })
   } catch (error) {
+    console.error('Courses API error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch courses' },
       { status: 500 }
