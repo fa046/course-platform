@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['localhost:3000', '*.app.github.dev', '*.vercel.app'],
     },
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.b-cdn.net',
+      },
+    ],
+  },
 }
 
 export default nextConfig

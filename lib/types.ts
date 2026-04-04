@@ -18,9 +18,21 @@ export type Lesson = {
   title: string
   description: string | null
   video_url: string | null
+  bunny_video_id: string | null   // Bunny Stream video GUID
   duration_seconds: number
   position: number
   is_free: boolean
+  created_at: string
+}
+
+export type LessonProgress = {
+  id: string
+  user_id: string
+  lesson_id: string
+  course_id: string
+  is_completed: boolean
+  watch_percent: number
+  last_watched_at: string
   created_at: string
 }
 
