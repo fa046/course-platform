@@ -17,8 +17,10 @@ export type Lesson = {
   course_id: string
   title: string
   description: string | null
-  video_url: string | null
-  bunny_video_id: string | null   // Bunny Stream video GUID
+  content_type: 'video' | 'pdf' | 'file'  // what kind of content
+  video_url: string | null                  // direct video URL (fallback)
+  bunny_video_id: string | null             // Bunny Stream video GUID
+  file_url: string | null                   // PDF / file URL on Bunny Storage
   duration_seconds: number
   position: number
   is_free: boolean
