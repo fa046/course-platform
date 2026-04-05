@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/courses(.*)',
   '/api/payments(.*)',
+  '/api/webhooks(.*)',  // Clerk + future webhooks (Safepay, Paddle)
 ])
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin(.*)'])
