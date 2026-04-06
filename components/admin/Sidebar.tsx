@@ -7,6 +7,8 @@ import { UserButton } from '@clerk/nextjs'
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: '◉', exact: true },
   { href: '/admin/courses', label: 'Courses', icon: '📚', exact: false },
+  { href: '/admin/enrollments', label: 'Enrollments', icon: '🎓', exact: false },
+  { href: '/admin/payments/local', label: 'Local Payments', icon: '💳', exact: false },
 ]
 
 export default function AdminSidebar() {
@@ -14,26 +16,23 @@ export default function AdminSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-64 bg-[#0F1F3D] flex flex-col z-40">
-      {/* Logo */}
       <div className="px-6 py-5 border-b border-white/10">
         <Link href="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center">
-            <span className="text-white font-bold text-sm">L</span>
+            <span className="text-white font-bold text-sm">S</span>
           </div>
           <div>
-            <span className="text-white font-semibold text-sm">LearnSmart</span>
+            <span className="text-white font-semibold text-sm">SmartSkillify</span>
             <p className="text-white/40 text-xs">Admin Panel</p>
           </div>
         </Link>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         {navItems.map(item => {
           const active = item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href)
-
           return (
             <Link
               key={item.href}
@@ -50,7 +49,6 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* Footer */}
       <div className="px-6 py-4 border-t border-white/10">
         <div className="flex items-center gap-3">
           <UserButton />
