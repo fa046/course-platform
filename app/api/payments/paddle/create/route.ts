@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { courseId, customerEmail, customerName } = await request.json()
+    const { courseId, customerEmail, customerName, customerPhone } = await request.json()
 
     if (!courseId) {
       return NextResponse.json({ error: 'Course ID required' }, { status: 400 })
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient()
 
-    // Get course with paddle_price_id
+    // Get course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('id, title, price_usd, paddle_price_id, is_published')
@@ -27,16 +27,11 @@ export async function POST(request: Request) {
     if (courseError || !course) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
-
     if (!course.is_published) {
       return NextResponse.json({ error: 'Course not available' }, { status: 400 })
     }
-
     if (!course.paddle_price_id) {
-      return NextResponse.json(
-        { error: 'Payment not configured for this course yet' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Online card payment is not yet configured for this course. Please use a local payment method.' }, { status: 400 })
     }
 
     // Ensure user exists in Supabase
@@ -51,57 +46,42 @@ export async function POST(request: Request) {
       }, { onConflict: 'id' })
     }
 
+    // Save enrollment intent with student info (phone/name)
+    // This upserts so if they come back the data is updated
+    await supabase.from('enrollments').upsert({
+      user_id: userId,
+      course_id: courseId,
+      full_name: customerName || null,
+      phone: customerPhone || null,
+    }, { onConflict: 'user_id,course_id', ignoreDuplicates: false })
+    .then(() => {}) // ignore error — will be properly set after payment completes
+
     const apiKey = process.env.PADDLE_API_KEY
     const env = process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox'
-    const baseUrl = env === 'production'
-      ? 'https://api.paddle.com'
-      : 'https://sandbox-api.paddle.com'
+    const baseUrl = env === 'production' ? 'https://api.paddle.com' : 'https://sandbox-api.paddle.com'
 
-    // Create Paddle transaction
     const paddleRes = await fetch(`${baseUrl}/transactions`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [
-          {
-            price_id: course.paddle_price_id,
-            quantity: 1,
-          },
-        ],
-        customer: {
-          email: customerEmail,
-          name: customerName,
-        },
-        custom_data: {
-          user_id: userId,
-          course_id: courseId,
-        },
-        checkout: {
-          url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?course=${courseId}`,
-        },
+        items: [{ price_id: course.paddle_price_id, quantity: 1 }],
+        customer: { email: customerEmail, name: customerName },
+        custom_data: { user_id: userId, course_id: courseId, customer_phone: customerPhone || '' },
+        checkout: { url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?course=${courseId}` },
       }),
     })
 
     if (!paddleRes.ok) {
       const err = await paddleRes.json()
       console.error('Paddle API error:', err)
-      return NextResponse.json(
-        { error: 'Failed to create payment session' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to create payment session' }, { status: 500 })
     }
 
     const paddleData = await paddleRes.json()
     const checkoutUrl = paddleData.data?.checkout?.url
 
     if (!checkoutUrl) {
-      return NextResponse.json(
-        { error: 'No checkout URL returned from Paddle' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'No checkout URL from Paddle' }, { status: 500 })
     }
 
     // Save pending payment record
@@ -113,7 +93,7 @@ export async function POST(request: Request) {
       gateway: 'paddle',
       status: 'pending',
       gateway_payment_id: paddleData.data?.id,
-      metadata: { transaction_id: paddleData.data?.id },
+      metadata: { transaction_id: paddleData.data?.id, customer_name: customerName, customer_phone: customerPhone },
     })
 
     return NextResponse.json({ checkoutUrl })

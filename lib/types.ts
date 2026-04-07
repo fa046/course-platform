@@ -9,6 +9,7 @@ export type Course = {
   is_free: boolean
   is_published: boolean
   paddle_price_id: string | null
+  related_blog_url: string | null   // optional blog link admin can set
   created_at: string
   lessons?: Lesson[]
   sections?: CourseSection[]
