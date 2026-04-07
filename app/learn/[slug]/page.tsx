@@ -5,6 +5,20 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { Course, Lesson, LessonProgress } from '@/lib/types'
 
+// ─── Bunny CDN URL helper ─────────────────────────────────────────────────────
+const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+
+const getFullUrl = (path: string | null) => {
+  if (!path) return ''
+  if (path.includes('sg.storage.bunnycdn.com')) {
+    return path.replace('https://sg.storage.bunnycdn.com/smartlearn', BUNNY_URL)
+  }
+  if (!path.startsWith('http')) {
+    return `${BUNNY_URL}/${path}`
+  }
+  return path
+}
+
 // ─── Bunny Player ─────────────────────────────────────────────────────────────
 function BunnyPlayer({ lesson, onProgress, onComplete }: {
   lesson: Lesson
@@ -15,7 +29,7 @@ function BunnyPlayer({ lesson, onProgress, onComplete }: {
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_STREAM_LIBRARY_ID
   const embedUrl = lesson.bunny_video_id && libraryId
     ? `https://iframe.mediadelivery.net/embed/${libraryId}/${lesson.bunny_video_id}?autoplay=false&loop=false&muted=false&preload=true&responsive=true`
-    : lesson.video_url || null
+    : getFullUrl(lesson.video_url)
 
   useEffect(() => {
     completedRef.current = false
@@ -58,30 +72,38 @@ function BunnyPlayer({ lesson, onProgress, onComplete }: {
 
 // ─── File Viewer ──────────────────────────────────────────────────────────────
 function FileViewer({ lesson, onComplete }: { lesson: Lesson; onComplete: () => void }) {
-  const fileUrl = lesson.file_url || lesson.video_url
-  const isPDF = lesson.content_type === 'pdf' || (fileUrl ?? '').toLowerCase().endsWith('.pdf')
-  if (!fileUrl) return <div className="w-full h-full flex items-center justify-center"><p className="text-white/20 text-sm">File not available</p></div>
+  const fileUrl = getFullUrl(lesson.file_url || lesson.video_url || '')
+  const isPDF = lesson.content_type === 'pdf' || fileUrl.toLowerCase().endsWith('.pdf')
+
+  if (!fileUrl) return (
+    <div className="w-full h-full flex items-center justify-center">
+      <p className="text-white/20 text-sm">File not available</p>
+    </div>
+  )
+
   return (
     <div className="w-full h-full flex flex-col bg-[#060D1F]">
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06] flex-shrink-0">
         <span className="text-xs text-white/30 uppercase tracking-wider">{isPDF ? 'PDF Document' : 'File'}</span>
         <div className="flex items-center gap-2">
-          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-white/30 hover:text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">Open ↗</a>
-          <a href={fileUrl} download className="text-xs text-white/30 hover:text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">↓ Download</a>
+          <a href={fileUrl} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-white/30 hover:text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">Open ↗</a>
+          <a href={fileUrl} download
+            className="text-xs text-white/30 hover:text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">↓ Download</a>
         </div>
       </div>
       <div className="flex-1 overflow-hidden">
         {isPDF
-          ? <iframe src={`${fileUrl}#toolbar=1&navpanes=0`} className="w-full h-full border-0" />
+          ? <iframe src={`${fileUrl}#toolbar=1&navpanes=0&scrollbar=1`} className="w-full h-full border-0" />
           : <div className="flex flex-col items-center justify-center h-full gap-5">
               <div className="text-6xl">📎</div>
-              <p className="text-white/50 text-sm">{lesson.title}</p>
+              <p className="text-white/50 text-sm font-medium">{lesson.title}</p>
               <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
                 className="bg-[#2563EB] text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-blue-500 transition-colors">↓ Download File</a>
             </div>}
       </div>
       <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.06] flex-shrink-0 bg-[#0A1628]">
-        <span className="text-xs text-white/20">Read the document, then mark complete</span>
+        <span className="text-xs text-white/20">Read the document above, then mark complete</span>
         <button onClick={onComplete}
           className="flex items-center gap-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 px-4 py-2 rounded-lg text-sm font-medium transition-all border border-emerald-500/20">
           ✓ Mark as Read
@@ -103,7 +125,7 @@ export default function LearnPage() {
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null)
   const [progressMap, setProgressMap] = useState<Record<string, LessonProgress>>({})
   const [loading, setLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen] = useState(false) // default closed on mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [livePercent, setLivePercent] = useState(0)
   const savingRef = useRef(false)
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -205,7 +227,6 @@ export default function LearnPage() {
   function selectLesson(lesson: Lesson) {
     setActiveLesson(lesson)
     setLivePercent(progressMap[lesson.id]?.watch_percent ?? 0)
-    // Close sidebar on mobile after selecting
     if (window.innerWidth < 768) setSidebarOpen(false)
   }
 
@@ -266,7 +287,6 @@ export default function LearnPage() {
               <span className="text-white/25 text-xs tabular-nums">{overallPercent}%</span>
             </div>
           )}
-          {/* Certificate link when complete */}
           {overallPercent === 100 && (
             <a href={`/certificate/${slug}`}
               className="hidden sm:flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors bg-amber-400/10 px-3 py-1.5 rounded-lg">
@@ -340,12 +360,14 @@ export default function LearnPage() {
                   </div>
                 )}
 
-                {activeLesson.description && <p className="text-white/35 text-sm leading-relaxed mb-5">{activeLesson.description}</p>}
+                {activeLesson.description && (
+                  <p className="text-white/35 text-sm leading-relaxed mb-5">{activeLesson.description}</p>
+                )}
 
                 {activeLesson.file_url && isVideo && (
                   <div className="mb-5 p-3.5 rounded-xl bg-white/[0.025] border border-white/[0.06]">
                     <p className="text-[10px] text-white/25 uppercase tracking-wider mb-2">Resources</p>
-                    <a href={activeLesson.file_url} download target="_blank" rel="noopener noreferrer"
+                    <a href={getFullUrl(activeLesson.file_url)} download target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2 text-sm text-[#2563EB] hover:text-blue-400 transition-colors">
                       <span>📎</span><span>Download lesson file</span>
                     </a>
@@ -385,10 +407,7 @@ export default function LearnPage() {
 
         {/* ── Mobile overlay backdrop ── */}
         {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-10 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black/50 z-10 md:hidden" onClick={() => setSidebarOpen(false)} />
         )}
 
         {/* ── Sidebar ── */}
@@ -405,8 +424,8 @@ export default function LearnPage() {
               <h3 className="text-white/70 text-sm font-semibold">Course Content</h3>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-white/25 tabular-nums">{completedCount}/{totalLessons}</span>
-                {/* Close button on mobile */}
-                <button onClick={() => setSidebarOpen(false)} className="md:hidden text-white/30 hover:text-white/70 w-6 h-6 flex items-center justify-center">✕</button>
+                <button onClick={() => setSidebarOpen(false)}
+                  className="md:hidden text-white/30 hover:text-white/70 w-6 h-6 flex items-center justify-center">✕</button>
               </div>
             </div>
             <div className="h-1 bg-white/8 rounded-full overflow-hidden">
@@ -438,8 +457,12 @@ export default function LearnPage() {
                       }`}>{lesson.title}</p>
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className="text-[10px] text-white/15">{type === 'video' ? '▶' : type === 'pdf' ? '📄' : '📎'}</span>
-                        {lesson.duration_seconds > 0 && <span className="text-[10px] text-white/15 tabular-nums">{Math.floor(lesson.duration_seconds / 60)}m</span>}
-                        {!isCompleted && watchPct > 0 && <span className="text-[10px] text-[#2563EB]/50 tabular-nums">· {watchPct}%</span>}
+                        {lesson.duration_seconds > 0 && (
+                          <span className="text-[10px] text-white/15 tabular-nums">{Math.floor(lesson.duration_seconds / 60)}m</span>
+                        )}
+                        {!isCompleted && watchPct > 0 && (
+                          <span className="text-[10px] text-[#2563EB]/50 tabular-nums">· {watchPct}%</span>
+                        )}
                       </div>
                       {!isCompleted && watchPct > 0 && (
                         <div className="mt-2 h-0.5 bg-white/6 rounded-full overflow-hidden">
