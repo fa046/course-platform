@@ -21,11 +21,29 @@ export async function GET(
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ course })
+    // Fetch sections
+    const { data: sections } = await supabase
+      .from('course_sections')
+      .select('*')
+      .eq('course_id', course.id)
+      .order('position', { ascending: true })
+
+    // Attach lessons to sections
+    const sectionsWithLessons = (sections || []).map(section => ({
+      ...section,
+      lessons: (course.lessons || []).filter((l: any) => l.section_id === section.id),
+    }))
+
+    const unsectionedLessons = (course.lessons || []).filter((l: any) => !l.section_id)
+
+    return NextResponse.json({
+      course: {
+        ...course,
+        sections: sectionsWithLessons,
+        unsectioned_lessons: unsectionedLessons,
+      },
+    })
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch course' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch course' }, { status: 500 })
   }
 }

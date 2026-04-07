@@ -1,5 +1,5 @@
 import Link from "next/link";
-
+import FeaturedBlogSection from '@/components/blog/FeaturedBlogSection'
 const stats = [
   { value: "12,000+", label: "Students Enrolled" },
   { value: "48", label: "Expert Courses" },
@@ -331,7 +331,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
+      <FeaturedBlogSection />
       {/* CTA */}
       <section className="py-24 px-6 bg-[#F8F9FF]">
         <div className="max-w-4xl mx-auto text-center">
