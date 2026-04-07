@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Lesson } from '@/lib/types'
 
+// Define the Public Pull Zone URL
+const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net';
+
 type LessonForm = {
   title: string
   description: string
@@ -36,6 +39,20 @@ export default function LessonsPage() {
   const videoInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // --- HELPER TO GET PUBLIC URL ---
+  const getFileUrl = (path: string | null) => {
+    if (!path) return "";
+    // If it's an old storage URL, swap it to the Pull Zone
+    if (path.includes('sg.storage.bunnycdn.com')) {
+      return path.replace('https://sg.storage.bunnycdn.com/smartlearn', BUNNY_URL);
+    }
+    // If it's a relative path (new way), add the CDN domain
+    if (!path.startsWith('http')) {
+      return `${BUNNY_URL}/${path}`;
+    }
+    return path;
+  };
+
   const fetchLessons = async () => {
     const r = await fetch(`/api/admin/lessons/${slug}`)
     const data = await r.json()
@@ -53,7 +70,7 @@ export default function LessonsPage() {
     setForm({
       title: lesson.title,
       description: lesson.description ?? '',
-      content_type: lesson.content_type || 'video',
+      content_type: (lesson.content_type as 'video' | 'pdf' | 'file') || 'video',
       bunny_video_id: lesson.bunny_video_id ?? '',
       file_url: lesson.file_url ?? '',
       duration_seconds: lesson.duration_seconds,
@@ -62,7 +79,6 @@ export default function LessonsPage() {
     setShowForm(true)
   }
 
-  // Upload video to Bunny Stream
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -71,7 +87,6 @@ export default function LessonsPage() {
     setUploadStatus('Creating video on Bunny Stream...')
 
     try {
-      // Step 1: Get upload URL from Bunny
       const res = await fetch('/api/lessons/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,7 +97,6 @@ export default function LessonsPage() {
 
       setUploadStatus('Uploading video...')
 
-      // Step 2: Upload directly to Bunny
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         xhr.upload.onprogress = (e) => {
@@ -104,7 +118,6 @@ export default function LessonsPage() {
     }
   }
 
-  // Upload PDF/file to Bunny Storage
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -123,6 +136,10 @@ export default function LessonsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Upload failed')
 
+      /**
+       * The API now returns a clean relative path like "lessons/123.pdf"
+       * We store this directly. 
+       */
       setForm(f => ({ ...f, file_url: data.url }))
       setUploadStatus('✓ File uploaded successfully!')
     } catch (err: any) {
@@ -198,7 +215,7 @@ export default function LessonsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6 shadow-sm">
         {lessons.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-400 text-sm">No lessons yet.</p>
@@ -210,12 +227,12 @@ export default function LessonsPage() {
               <div key={lesson.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
                 <div className="flex flex-col gap-0.5">
                   <button onClick={() => moveLesson(index, 'up')} disabled={index === 0}
-                    className="text-gray-300 hover:text-gray-500 disabled:opacity-20 text-xs leading-none">▲</button>
+                    className="text-gray-300 hover:text-gray-500 disabled:opacity-20 text-xs leading-none transition-colors">▲</button>
                   <button onClick={() => moveLesson(index, 'down')} disabled={index === lessons.length - 1}
-                    className="text-gray-300 hover:text-gray-500 disabled:opacity-20 text-xs leading-none">▼</button>
+                    className="text-gray-300 hover:text-gray-500 disabled:opacity-20 text-xs leading-none transition-colors">▼</button>
                 </div>
                 <span className="w-6 text-center text-sm text-gray-400 font-mono">{index + 1}</span>
-                <span className="text-lg">{contentIcon(lesson.content_type)}</span>
+                <span className="text-lg">{contentIcon(lesson.content_type || 'video')}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm text-[#0F1F3D] truncate">{lesson.title}</p>
@@ -229,9 +246,9 @@ export default function LessonsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => openEdit(lesson)} className="text-xs text-[#2563EB] hover:text-[#1D4ED8] font-medium">Edit</button>
+                  <button onClick={() => openEdit(lesson)} className="text-xs text-[#2563EB] hover:text-[#1D4ED8] font-medium transition-colors">Edit</button>
                   <button onClick={() => handleDelete(lesson.id, lesson.title)} disabled={deleting === lesson.id}
-                    className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-40">
+                    className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-40 transition-colors">
                     {deleting === lesson.id ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
@@ -241,7 +258,6 @@ export default function LessonsPage() {
         )}
       </div>
 
-      {/* Lesson Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -251,7 +267,6 @@ export default function LessonsPage() {
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Title *</label>
                 <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -259,7 +274,6 @@ export default function LessonsPage() {
                   className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]" />
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
                 <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -267,7 +281,6 @@ export default function LessonsPage() {
                   className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] resize-none" />
               </div>
 
-              {/* Content Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Content Type</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -284,7 +297,6 @@ export default function LessonsPage() {
                 </div>
               </div>
 
-              {/* Video Upload */}
               {form.content_type === 'video' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Video</label>
@@ -329,7 +341,6 @@ export default function LessonsPage() {
                 </div>
               )}
 
-              {/* PDF/File Upload */}
               {(form.content_type === 'pdf' || form.content_type === 'file') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -355,12 +366,19 @@ export default function LessonsPage() {
                     </button>
                   ) : (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-green-700">✓ File uploaded</p>
-                        <a href={form.file_url} target="_blank" className="text-xs text-[#2563EB] hover:underline">Preview →</a>
+                        <a 
+                          href={getFileUrl(form.file_url)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs text-[#2563EB] hover:underline truncate block max-w-xs"
+                        >
+                          Preview File →
+                        </a>
                       </div>
                       <button onClick={() => setForm(f => ({ ...f, file_url: '' }))}
-                        className="text-xs text-red-500 hover:text-red-600">Remove</button>
+                        className="text-xs text-red-500 hover:text-red-600 flex-shrink-0">Remove</button>
                     </div>
                   )}
                   {uploadStatus && !uploading && (
@@ -369,7 +387,6 @@ export default function LessonsPage() {
                 </div>
               )}
 
-              {/* Duration */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Duration (seconds)</label>
                 <input type="number" value={form.duration_seconds}
@@ -378,7 +395,6 @@ export default function LessonsPage() {
                   className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]" />
               </div>
 
-              {/* Free preview */}
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" checked={form.is_free}
                   onChange={e => setForm(f => ({ ...f, is_free: e.target.checked }))}

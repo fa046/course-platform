@@ -5,6 +5,25 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { Course, Lesson, LessonProgress } from '@/lib/types'
 
+// Define the Public Pull Zone URL
+const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net';
+
+/**
+ * Helper to handle the "Generation Gap" of URLs
+ * 1. Fixes old 'sg.storage' URLs
+ * 2. Prepend Bunny Pull Zone to relative paths
+ */
+const getFullUrl = (path: string | null) => {
+  if (!path) return "";
+  if (path.includes('sg.storage.bunnycdn.com')) {
+    return path.replace('https://sg.storage.bunnycdn.com/smartlearn', BUNNY_URL);
+  }
+  if (!path.startsWith('http')) {
+    return `${BUNNY_URL}/${path}`;
+  }
+  return path;
+};
+
 // ─── Bunny Player ─────────────────────────────────────────────────────────────
 function BunnyPlayer({
   lesson,
@@ -19,9 +38,11 @@ function BunnyPlayer({
   const completedRef = useRef(false)
 
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_STREAM_LIBRARY_ID
+  
+  // Use Stream ID if available, otherwise fallback to the calculated full URL
   const embedUrl = lesson.bunny_video_id && libraryId
     ? `https://iframe.mediadelivery.net/embed/${libraryId}/${lesson.bunny_video_id}?autoplay=false&loop=false&muted=false&preload=true&responsive=true`
-    : lesson.video_url || null
+    : getFullUrl(lesson.video_url);
 
   useEffect(() => {
     completedRef.current = false
@@ -86,8 +107,9 @@ function FileViewer({
   lesson: Lesson
   onComplete: () => void
 }) {
-  const fileUrl = lesson.file_url || lesson.video_url
-  const isPDF = lesson.content_type === 'pdf' || (fileUrl ?? '').toLowerCase().endsWith('.pdf')
+  // Use our helper to fix the path
+  const fileUrl = getFullUrl(lesson.file_url || lesson.video_url || "")
+  const isPDF = lesson.content_type === 'pdf' || fileUrl.toLowerCase().endsWith('.pdf')
 
   if (!fileUrl) {
     return (
@@ -99,7 +121,6 @@ function FileViewer({
 
   return (
     <div className="w-full h-full flex flex-col bg-[#060D1F]">
-      {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06] flex-shrink-0">
         <span className="text-xs text-white/30 uppercase tracking-wider">
           {isPDF ? 'PDF Document' : 'File'}
@@ -123,7 +144,6 @@ function FileViewer({
         </div>
       </div>
 
-      {/* Viewer area */}
       <div className="flex-1 overflow-hidden">
         {isPDF ? (
           <iframe
@@ -147,7 +167,6 @@ function FileViewer({
         )}
       </div>
 
-      {/* Mark as read */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.06] flex-shrink-0 bg-[#0A1628]">
         <span className="text-xs text-white/20">Read the document above, then mark complete</span>
         <button
@@ -179,10 +198,10 @@ export default function LearnPage() {
   const savingRef = useRef(false)
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // ── Data loading ────────────────────────────────────────────────────────────
   useEffect(() => { if (slug) fetchCourse() }, [slug])
   useEffect(() => { if (user && course) checkEnrollment() }, [user, course])
   useEffect(() => { if (user && course?.lessons?.length) loadProgress() }, [user, course])
+  
   useEffect(() => {
     setLivePercent(activeLesson ? (progressMap[activeLesson.id]?.watch_percent ?? 0) : 0)
   }, [activeLesson?.id])
@@ -195,7 +214,6 @@ export default function LearnPage() {
         setCourse(data.course)
         const lessons = data.course.lessons || []
         if (lessons.length > 0) {
-          // If ?lesson= param provided, jump to that lesson
           const target = initialLessonId
             ? lessons.find((l: Lesson) => l.id === initialLessonId)
             : null
@@ -228,7 +246,6 @@ export default function LearnPage() {
     setProgressMap(map)
   }
 
-  // ── Save progress (debounced) ───────────────────────────────────────────────
   const saveProgress = useCallback(async (
     lesson: Lesson, watchPercent: number, isCompleted: boolean
   ) => {
@@ -250,7 +267,6 @@ export default function LearnPage() {
     }, 2000)
   }, [course])
 
-  // ── Video progress ──────────────────────────────────────────────────────────
   const handleVideoProgress = useCallback((percent: number) => {
     setLivePercent(percent)
     if (activeLesson) {
@@ -261,7 +277,6 @@ export default function LearnPage() {
     }
   }, [activeLesson, progressMap, saveProgress])
 
-  // ── Complete lesson ─────────────────────────────────────────────────────────
   const handleComplete = useCallback(async () => {
     if (!activeLesson || !course) return
     if (progressMap[activeLesson.id]?.is_completed) return
@@ -279,13 +294,11 @@ export default function LearnPage() {
     finally { savingRef.current = false }
   }, [activeLesson, course, progressMap])
 
-  // ── Select lesson ───────────────────────────────────────────────────────────
   function selectLesson(lesson: Lesson) {
     setActiveLesson(lesson)
     setLivePercent(progressMap[lesson.id]?.watch_percent ?? 0)
   }
 
-  // ── Derived values ──────────────────────────────────────────────────────────
   const totalLessons = course?.lessons?.length || 0
   const completedCount = Object.values(progressMap).filter(p => p.is_completed).length
   const overallPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0
@@ -298,7 +311,6 @@ export default function LearnPage() {
   const isVideo = !activeLesson?.content_type || activeLesson.content_type === 'video'
   const activeLessonProgress = activeLesson ? progressMap[activeLesson.id] : null
 
-  // ── Loading state ───────────────────────────────────────────────────────────
   if (loading || !isLoaded) {
     return (
       <div className="min-h-screen bg-[#060D1F] flex items-center justify-center">
@@ -325,7 +337,6 @@ export default function LearnPage() {
   return (
     <div className="min-h-screen bg-[#060D1F] flex flex-col">
 
-      {/* ── Top Bar ── */}
       <header className="h-14 bg-[#0A1628] border-b border-white/[0.06] flex items-center justify-between px-4 flex-shrink-0 z-20">
         <div className="flex items-center gap-3 min-w-0">
           <a
@@ -366,13 +377,8 @@ export default function LearnPage() {
         </div>
       </header>
 
-      {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
-
-        {/* ── Content Area ── */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-          {/* Player */}
           <div className="bg-black flex-shrink-0 relative" style={{ aspectRatio: '16/9', maxHeight: '68vh' }}>
             {activeLesson ? (
               isVideo ? (
@@ -395,7 +401,6 @@ export default function LearnPage() {
               </div>
             )}
 
-            {/* Live progress bar */}
             {isVideo && livePercent > 0 && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20 pointer-events-none">
                 <div
@@ -406,12 +411,9 @@ export default function LearnPage() {
             )}
           </div>
 
-          {/* ── Info panel ── */}
           <div className="flex-1 overflow-y-auto bg-[#0A1628]/50 px-6 py-5">
             {activeLesson ? (
               <div className="max-w-2xl">
-
-                {/* Label + title */}
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -427,7 +429,6 @@ export default function LearnPage() {
                     <h2 className="text-white text-lg font-semibold leading-snug">{activeLesson.title}</h2>
                   </div>
 
-                  {/* Manual mark complete for video */}
                   {isVideo && !activeLessonProgress?.is_completed && (
                     <button
                       onClick={handleComplete}
@@ -438,7 +439,6 @@ export default function LearnPage() {
                   )}
                 </div>
 
-                {/* Watch progress */}
                 {isVideo && livePercent > 0 && !activeLessonProgress?.is_completed && (
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex-1 h-0.5 bg-white/8 rounded-full overflow-hidden">
@@ -451,17 +451,16 @@ export default function LearnPage() {
                   </div>
                 )}
 
-                {/* Description */}
                 {activeLesson.description && (
                   <p className="text-white/35 text-sm leading-relaxed mb-5">{activeLesson.description}</p>
                 )}
 
-                {/* Attached file (for video lessons that also have a resource) */}
+                {/* Fixed Resource Link */}
                 {activeLesson.file_url && isVideo && (
                   <div className="mb-5 p-3.5 rounded-xl bg-white/[0.025] border border-white/[0.06]">
                     <p className="text-[10px] text-white/25 uppercase tracking-wider mb-2">Resources</p>
                     <a
-                      href={activeLesson.file_url}
+                      href={getFullUrl(activeLesson.file_url)}
                       download
                       target="_blank"
                       rel="noopener noreferrer"
@@ -473,7 +472,6 @@ export default function LearnPage() {
                   </div>
                 )}
 
-                {/* Next lesson */}
                 {nextLesson && (
                   <button
                     onClick={() => selectLesson(nextLesson)}
@@ -493,7 +491,6 @@ export default function LearnPage() {
                   </button>
                 )}
 
-                {/* Course complete */}
                 {overallPercent === 100 && !nextLesson && (
                   <div className="mt-5 p-6 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-600/10 border border-emerald-500/20 text-center">
                     <div className="text-4xl mb-3">🎉</div>
@@ -508,10 +505,8 @@ export default function LearnPage() {
           </div>
         </div>
 
-        {/* ── Sidebar ── */}
         {sidebarOpen && (
           <aside className="w-72 xl:w-80 bg-[#0A1628] border-l border-white/[0.06] flex flex-col flex-shrink-0 overflow-hidden">
-
             <div className="px-4 py-4 border-b border-white/[0.06]">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-white/70 text-sm font-semibold">Course Content</h3>

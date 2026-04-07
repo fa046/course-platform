@@ -9,6 +9,7 @@ const navItems = [
   { href: '/admin/courses', label: 'Courses', icon: '📚', exact: false },
   { href: '/admin/enrollments', label: 'Enrollments', icon: '🎓', exact: false },
   { href: '/admin/payments/local', label: 'Local Payments', icon: '💳', exact: false },
+  { href: '/admin/blog', label: 'Blog', icon: '✍️', exact: false },
 ]
 
 export default function AdminSidebar() {

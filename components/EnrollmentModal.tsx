@@ -1,19 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { Course } from '@/lib/types'
+import { Course, Lesson } from '@/lib/types'
+
+const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net';
+const LIBRARY_ID = process.env.NEXT_PUBLIC_BUNNY_STREAM_LIBRARY_ID;
 
 interface EnrollmentModalProps {
   course: Course
   user: any
   onClose: () => void
   onSuccess: () => void
+  initialPreviewLesson?: Lesson | null // New prop to open a specific lesson
 }
 
-type Step = 'info' | 'payment'
+type Step = 'info' | 'payment' | 'preview'
 
-export default function EnrollmentModal({ course, user, onClose, onSuccess }: EnrollmentModalProps) {
-  const [step, setStep] = useState<Step>('info')
+export default function EnrollmentModal({ course, user, onClose, onSuccess, initialPreviewLesson }: EnrollmentModalProps) {
+  const [step, setStep] = useState<Step>(initialPreviewLesson ? 'preview' : 'info')
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(initialPreviewLesson || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -23,6 +28,22 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess }: En
     city: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // --- HELPER TO GET PUBLIC URL ---
+  const getFullUrl = (path: string | null) => {
+    if (!path) return "";
+    if (path.includes('sg.storage.bunnycdn.com')) {
+      return path.replace('https://sg.storage.bunnycdn.com/smartlearn', BUNNY_URL);
+    }
+    if (!path.startsWith('http')) {
+      return `${BUNNY_URL}/${path}`;
+    }
+    return path;
+  };
+
+  const previewUrl = activeLesson?.bunny_video_id && LIBRARY_ID
+    ? `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${activeLesson.bunny_video_id}?autoplay=true`
+    : getFullUrl(activeLesson?.file_url || activeLesson?.video_url || "");
 
   function validate() {
     const e: Record<string, string> = {}
@@ -55,13 +76,10 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess }: En
         }),
       })
       const data = await res.json()
-      if (data.success) {
-        onSuccess()
-      } else {
-        setError(data.error || 'Enrollment failed. Please try again.')
-      }
+      if (data.success) onSuccess()
+      else setError(data.error || 'Enrollment failed.')
     } catch (e) {
-      setError('Something went wrong. Please try again.')
+      setError('Something went wrong.')
     } finally {
       setLoading(false)
     }
@@ -83,14 +101,13 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess }: En
         }),
       })
       const data = await res.json()
-      if (data.redirectUrl) {
-        window.location.href = data.redirectUrl
-      } else {
-        setError('Payment gateway not available yet. Please try again later.')
+      if (data.redirectUrl) window.location.href = data.redirectUrl
+      else {
+        setError('Payment gateway not available.');
         setLoading(false)
       }
     } catch (e) {
-      setError('Payment failed. Please try again.')
+      setError('Payment failed.');
       setLoading(false)
     }
   }
@@ -110,14 +127,13 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess }: En
         }),
       })
       const data = await res.json()
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl
-      } else {
-        setError('Payment gateway not available yet. Please try again later.')
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl
+      else {
+        setError('Payment gateway not available.');
         setLoading(false)
       }
     } catch (e) {
-      setError('Payment failed. Please try again.')
+      setError('Payment failed.');
       setLoading(false)
     }
   }
@@ -127,15 +143,17 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess }: En
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(15, 31, 61, 0.75)', backdropFilter: 'blur(8px)' }}
     >
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div className={`bg-white rounded-2xl w-full shadow-2xl overflow-hidden transition-all ${step === 'preview' ? 'max-w-4xl' : 'max-w-md'}`}>
 
         {/* Header */}
         <div className="bg-[#0F1F3D] px-6 py-5 flex items-center justify-between">
           <div>
             <h2 className="text-white font-bold text-lg">
-              {step === 'info' ? 'Your Information' : 'Choose Payment'}
+              {step === 'info' ? 'Your Information' : step === 'payment' ? 'Choose Payment' : 'Free Preview'}
             </h2>
-            <p className="text-white/40 text-xs mt-0.5 truncate max-w-[260px]">{course.title}</p>
+            <p className="text-white/40 text-xs mt-0.5 truncate max-w-[260px]">
+              {step === 'preview' ? activeLesson?.title : course.title}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -145,204 +163,133 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess }: En
           </button>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-0.5 bg-[#0F1F3D]/8">
-          <div
-            className="h-full bg-[#2563EB] transition-all duration-300"
-            style={{ width: step === 'info' ? '50%' : '100%' }}
-          />
-        </div>
+        {/* Progress bar (hidden in preview) */}
+        {step !== 'preview' && (
+          <div className="h-0.5 bg-[#0F1F3D]/8">
+            <div
+              className="h-full bg-[#2563EB] transition-all duration-300"
+              style={{ width: step === 'info' ? '50%' : '100%' }}
+            />
+          </div>
+        )}
 
-        <div className="p-6">
-
-          {/* Error banner */}
+        <div className="p-0">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+            <div className="m-6 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
               {error}
+            </div>
+          )}
+
+          {/* ── Step: Preview Mode ── */}
+          {step === 'preview' && (
+            <div className="flex flex-col md:flex-row h-[70vh] md:h-[600px]">
+              <div className="flex-[2] bg-black flex items-center justify-center">
+                {activeLesson?.content_type === 'video' || activeLesson?.bunny_video_id ? (
+                  <iframe src={previewUrl} className="w-full h-full border-0" allowFullScreen allow="autoplay" />
+                ) : activeLesson?.content_type === 'pdf' ? (
+                  <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full border-0" />
+                ) : (
+                  <div className="text-white/20 text-center">
+                    <p className="text-4xl mb-2">📎</p>
+                    <p className="text-sm">Preview not available for this type</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex-1 bg-gray-50 border-l border-gray-100 p-6 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-[#0F1F3D] text-lg mb-2">Enjoying this lesson?</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                    Enroll now to unlock the full course, assignments, and get your certificate.
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setStep('info')}
+                    className="w-full py-3.5 bg-[#2563EB] text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all"
+                  >
+                    Enroll for Full Access
+                  </button>
+                  <button onClick={onClose} className="w-full py-3 text-sm text-gray-400 hover:text-gray-600">
+                    Close Preview
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
           {/* ── Step 1: Info ── */}
           {step === 'info' && (
-            <div className="space-y-4">
-              <p className="text-sm text-[#64748B] mb-2">
-                {course.is_free
-                  ? 'Fill in your details to get free access.'
-                  : 'Fill in your details to continue to payment.'}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-[#64748B]">
+                {course.is_free ? 'Fill in your details for free access.' : 'Fill in your details to continue.'}
               </p>
 
-              {/* Full Name */}
               <div>
-                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">
-                  Full Name *
-                </label>
+                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">Full Name *</label>
                 <input
                   type="text"
                   value={form.fullName}
                   onChange={e => setForm({ ...form, fullName: e.target.value })}
-                  placeholder="Your full name"
-                  className={`w-full border rounded-xl px-4 py-3 text-sm text-[#0F1F3D] outline-none transition-all focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 ${
-                    errors.fullName ? 'border-red-400 bg-red-50' : 'border-[#0F1F3D]/15'
-                  }`}
+                  className={`w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#2563EB]/10 outline-none ${errors.fullName ? 'border-red-400' : 'border-[#0F1F3D]/15'}`}
                 />
-                {errors.fullName && <p className="text-xs text-red-500 mt-1">{errors.fullName}</p>}
               </div>
 
-              {/* Email */}
               <div>
-                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">
-                  Email Address *
-                </label>
+                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">Email *</label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
-                  placeholder="your@email.com"
-                  className={`w-full border rounded-xl px-4 py-3 text-sm text-[#0F1F3D] outline-none transition-all focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 ${
-                    errors.email ? 'border-red-400 bg-red-50' : 'border-[#0F1F3D]/15'
-                  }`}
+                  className={`w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#2563EB]/10 outline-none ${errors.email ? 'border-red-400' : 'border-[#0F1F3D]/15'}`}
                 />
-                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
               </div>
 
-              {/* Phone */}
               <div>
-                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">
-                  Phone Number *
-                </label>
+                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">Phone *</label>
                 <input
                   type="tel"
                   value={form.phone}
                   onChange={e => setForm({ ...form, phone: e.target.value })}
                   placeholder="03XX XXXXXXX"
-                  className={`w-full border rounded-xl px-4 py-3 text-sm text-[#0F1F3D] outline-none transition-all focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 ${
-                    errors.phone ? 'border-red-400 bg-red-50' : 'border-[#0F1F3D]/15'
-                  }`}
-                />
-                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-              </div>
-
-              {/* City */}
-              <div>
-                <label className="text-xs font-semibold text-[#0F1F3D] uppercase tracking-wider mb-1.5 block">
-                  City <span className="text-[#64748B] font-normal normal-case">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.city}
-                  onChange={e => setForm({ ...form, city: e.target.value })}
-                  placeholder="Lahore, Karachi, etc."
-                  className="w-full border border-[#0F1F3D]/15 rounded-xl px-4 py-3 text-sm text-[#0F1F3D] outline-none transition-all focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                  className={`w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#2563EB]/10 outline-none ${errors.phone ? 'border-red-400' : 'border-[#0F1F3D]/15'}`}
                 />
               </div>
 
-              {course.is_free ? (
-                <button
-                  onClick={handleFreeCourseEnroll}
-                  disabled={loading}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Enrolling...
-                    </>
-                  ) : (
-                    'Enroll for Free →'
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleNext}
-                  className="w-full py-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl transition-all mt-2 shadow-lg shadow-[#2563EB]/20"
-                >
-                  Continue to Payment →
-                </button>
-              )}
+              <button
+                onClick={course.is_free ? handleFreeCourseEnroll : handleNext}
+                disabled={loading}
+                className={`w-full py-4 text-white font-semibold rounded-xl transition-all mt-2 ${course.is_free ? 'bg-emerald-600' : 'bg-[#2563EB]'}`}
+              >
+                {loading ? 'Processing...' : course.is_free ? 'Enroll for Free →' : 'Continue to Payment →'}
+              </button>
             </div>
           )}
 
           {/* ── Step 2: Payment ── */}
           {step === 'payment' && (
-            <div>
-              <div className="bg-[#F8F9FF] rounded-xl p-4 mb-6 flex items-center justify-between">
+            <div className="p-6 space-y-4">
+              <div className="bg-[#F8F9FF] rounded-xl p-4 flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-[#64748B] mb-1">Total Amount</div>
-                  <div className="text-2xl font-bold text-[#0F1F3D]">
-                    Rs. {course.price_pkr.toLocaleString()}
-                  </div>
+                  <div className="text-xs text-[#64748B]">Total Amount</div>
+                  <div className="text-2xl font-bold text-[#0F1F3D]">Rs. {course.price_pkr.toLocaleString()}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-[#64748B] mb-1">International</div>
-                  <div className="text-lg font-semibold text-[#64748B]">${course.price_usd}</div>
-                </div>
+                <div className="text-right text-gray-400 text-sm font-semibold">${course.price_usd}</div>
               </div>
 
-              <p className="text-sm font-semibold text-[#0F1F3D] mb-4">Select payment method:</p>
-
-              <div className="space-y-3 mb-6">
-                <button
-                  onClick={handleSafepayPayment}
-                  disabled={loading}
-                  className="w-full p-4 border-2 border-[#0F1F3D]/10 rounded-xl hover:border-[#2563EB] hover:bg-[#2563EB]/3 transition-all text-left group disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#2563EB]/10 rounded-xl flex items-center justify-center text-lg">🇵🇰</div>
-                      <div>
-                        <div className="font-semibold text-sm text-[#0F1F3D] group-hover:text-[#2563EB] transition-colors">
-                          Pay in PKR
-                        </div>
-                        <div className="text-xs text-[#64748B]">JazzCash, Easypaisa, Bank Card</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-[#0F1F3D]">Rs. {course.price_pkr.toLocaleString()}</div>
-                      <div className="text-xs text-[#64748B]">via Safepay</div>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <button onClick={handleSafepayPayment} disabled={loading} className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all">
+                  <span className="block font-bold text-sm">Pay in PKR</span>
+                  <span className="text-xs text-gray-500">Easypaisa, JazzCash, Card</span>
                 </button>
-
-                <button
-                  onClick={handlePaddlePayment}
-                  disabled={loading}
-                  className="w-full p-4 border-2 border-[#0F1F3D]/10 rounded-xl hover:border-[#2563EB] hover:bg-[#2563EB]/3 transition-all text-left group disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#2563EB]/10 rounded-xl flex items-center justify-center text-lg">🌍</div>
-                      <div>
-                        <div className="font-semibold text-sm text-[#0F1F3D] group-hover:text-[#2563EB] transition-colors">
-                          Pay Internationally
-                        </div>
-                        <div className="text-xs text-[#64748B]">Card, PayPal, Apple Pay, Google Pay</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-[#0F1F3D]">${course.price_usd}</div>
-                      <div className="text-xs text-[#64748B]">via Paddle</div>
-                    </div>
-                  </div>
+                <button onClick={handlePaddlePayment} disabled={loading} className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all">
+                  <span className="block font-bold text-sm">Pay Internationally</span>
+                  <span className="text-xs text-gray-500">PayPal, Google Pay, Card</span>
                 </button>
               </div>
 
-              {loading && (
-                <div className="flex items-center justify-center gap-2 text-sm text-[#64748B] mb-4">
-                  <div className="w-4 h-4 border-2 border-[#64748B]/30 border-t-[#64748B] rounded-full animate-spin" />
-                  Redirecting to payment...
-                </div>
-              )}
-
-              <button
-                onClick={() => setStep('info')}
-                className="w-full text-sm text-[#64748B] hover:text-[#0F1F3D] transition-colors py-2"
-              >
-                ← Back
-              </button>
-
-              <p className="text-xs text-[#64748B] text-center mt-3">
-                🔒 Secure payment. 30-day money-back guarantee.
-              </p>
+              <button onClick={() => setStep('info')} className="w-full text-sm text-gray-400 py-2">← Back</button>
             </div>
           )}
         </div>

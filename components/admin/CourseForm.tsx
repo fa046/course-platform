@@ -1,14 +1,36 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Course } from '@/lib/types'
 
 type Props = { initialData?: Course }
 
+type BlogPost = {
+  id: string
+  title: string
+  slug: string
+  is_published: boolean
+}
+
+const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+
 function slugify(text: string) {
   return text.toLowerCase().trim()
     .replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+}
+
+// ✅ Resolves any path/URL to a full displayable URL
+function getImageUrl(path: string): string {
+  if (!path) return ''
+  if (path.startsWith('http')) {
+    if (path.includes('.storage.bunnycdn.com')) {
+      const match = path.match(/\.storage\.bunnycdn\.com\/[^/]+\/(.+)/)
+      return match ? `${BUNNY_PULL_ZONE}/${match[1]}` : path
+    }
+    return path
+  }
+  return `${BUNNY_PULL_ZONE}/${path.replace(/^\//, '')}`
 }
 
 export default function CourseForm({ initialData }: Props) {
@@ -32,6 +54,15 @@ export default function CourseForm({ initialData }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [uploadingThumb, setUploadingThumb] = useState(false)
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
+  const [blogMode, setBlogMode] = useState<'pick' | 'manual'>('pick')
+
+  useEffect(() => {
+    fetch('/api/admin/blog')
+      .then(r => r.json())
+      .then(data => setBlogPosts(data.posts ?? []))
+      .catch(() => {})
+  }, [])
 
   const set = (key: string, value: unknown) => setForm(f => ({ ...f, [key]: value }))
 
@@ -55,12 +86,24 @@ export default function CourseForm({ initialData }: Props) {
       const res = await fetch('/api/admin/upload/image', { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Upload failed')
-      set('thumbnail_url', data.url)
+
+      // ✅ FIXED: save clean relative path e.g. "thumbnails/1234-img.jpg"
+      // Use path field from API, or strip pull zone prefix from url
+      const cleanPath = data.path || data.url.replace(BUNNY_PULL_ZONE + '/', '').replace(/^\//, '')
+      set('thumbnail_url', cleanPath)
     } catch (err: any) {
       setError(err.message || 'Thumbnail upload failed')
     } finally {
       setUploadingThumb(false)
     }
+  }
+
+  const handleBlogPick = (slug: string) => {
+    if (!slug) {
+      set('related_blog_url', '')
+      return
+    }
+    set('related_blog_url', `https://www.smartskillify.com/blog/${slug}`)
   }
 
   const handleSubmit = async () => {
@@ -84,6 +127,10 @@ export default function CourseForm({ initialData }: Props) {
   }
 
   const inputClass = "w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+
+  const selectedSlug = form.related_blog_url
+    ? form.related_blog_url.replace('https://www.smartskillify.com/blog/', '')
+    : ''
 
   return (
     <div className="max-w-2xl">
@@ -126,11 +173,16 @@ export default function CourseForm({ initialData }: Props) {
               <span className="text-xs text-gray-400">or paste a URL below</span>
             </div>
             <input value={form.thumbnail_url} onChange={e => set('thumbnail_url', e.target.value)}
-              placeholder="https://..."
+              placeholder="https://... or leave blank to upload above"
               className={inputClass} />
             {form.thumbnail_url && (
               <div className="relative group w-fit">
-                <img src={form.thumbnail_url} alt="preview" className="h-36 rounded-lg object-cover border border-gray-200" />
+                {/* ✅ FIXED: use getImageUrl so relative paths display correctly */}
+                <img
+                  src={getImageUrl(form.thumbnail_url)}
+                  alt="preview"
+                  className="h-36 rounded-lg object-cover border border-gray-200"
+                />
                 <button onClick={() => set('thumbnail_url', '')}
                   className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs items-center justify-center hidden group-hover:flex">✕</button>
               </div>
@@ -183,12 +235,46 @@ export default function CourseForm({ initialData }: Props) {
         {/* Related Blog URL */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Related Blog URL <span className="text-gray-400 font-normal">(optional)</span>
+            Related Blog Post <span className="text-gray-400 font-normal">(optional)</span>
           </label>
-          <input value={form.related_blog_url} onChange={e => set('related_blog_url', e.target.value)}
-            placeholder="https://www.smartskillify.com/blog/..."
-            className={inputClass} />
-          <p className="text-xs text-gray-400 mt-1">Shown as a link on the course page for SEO</p>
+          <div className="flex gap-2 mb-3">
+            <button type="button"
+              onClick={() => setBlogMode('pick')}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${blogMode === 'pick' ? 'bg-[#2563EB] text-white border-[#2563EB]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+              Pick from blog
+            </button>
+            <button type="button"
+              onClick={() => setBlogMode('manual')}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${blogMode === 'manual' ? 'bg-[#2563EB] text-white border-[#2563EB]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+              Enter URL manually
+            </button>
+          </div>
+          {blogMode === 'pick' ? (
+            <div>
+              <select value={selectedSlug} onChange={e => handleBlogPick(e.target.value)} className={inputClass}>
+                <option value="">— No blog post linked —</option>
+                {blogPosts.map(post => (
+                  <option key={post.id} value={post.slug}>
+                    {post.title}{!post.is_published ? ' (draft)' : ''}
+                  </option>
+                ))}
+              </select>
+              {form.related_blog_url && (
+                <p className="text-xs text-gray-400 mt-1 font-mono truncate">{form.related_blog_url}</p>
+              )}
+              {blogPosts.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No blog posts yet.{' '}
+                  <a href="/admin/blog/new" target="_blank" className="underline">Create one first →</a>
+                </p>
+              )}
+            </div>
+          ) : (
+            <input value={form.related_blog_url} onChange={e => set('related_blog_url', e.target.value)}
+              placeholder="https://www.smartskillify.com/blog/..."
+              className={inputClass} />
+          )}
+          <p className="text-xs text-gray-400 mt-1">Shown as a link on the course page</p>
         </div>
 
         {/* Published */}
