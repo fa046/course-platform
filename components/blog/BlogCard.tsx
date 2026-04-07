@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 
+const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+
 interface BlogPost {
   id: string
   title: string
@@ -30,16 +32,38 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
     day: 'numeric',
   })
 
+  // ✅ FIXED: clean unified URL resolver
+  // Handles all cases: relative paths, full CDN URLs, legacy storage URLs, external URLs
+  const getFullImageUrl = (path: string | null): string | null => {
+    if (!path) return null
+
+    // Full URL cases
+    if (path.startsWith('http')) {
+      // Legacy records saved before env fix: private storage URL → swap to pull zone
+      if (path.includes('.storage.bunnycdn.com')) {
+        // Extract everything after the storage zone name
+        const match = path.match(/\.storage\.bunnycdn\.com\/[^/]+\/(.+)/)
+        return match ? `${BUNNY_PULL_ZONE}/${match[1]}` : path
+      }
+      // Already a correct CDN or external URL
+      return path
+    }
+
+    // Relative path like "blog/123-img.jpg" or "thumbnails/123-img.jpg"
+    return `${BUNNY_PULL_ZONE}/${path.replace(/^\//, '')}`
+  }
+
+  const imageUrl = getFullImageUrl(post.thumbnail_url)
+
   if (featured) {
     return (
       <Link href={`/blog/${post.slug}`} className="group block">
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 h-full border border-gray-100">
-          {/* Thumbnail */}
           <div className="relative w-full h-52 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden">
-            {post.thumbnail_url ? (
+            {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={post.thumbnail_url}
+                src={imageUrl}
                 alt={post.title}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -61,7 +85,6 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
             )}
           </div>
 
-          {/* Content */}
           <div className="p-5">
             <h3 className="font-bold text-slate-900 text-lg leading-snug mb-2 group-hover:text-blue-600 transition-colors line-clamp-2">
               {post.title}
@@ -89,16 +112,14 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
     )
   }
 
-  // Standard card for listing page
   return (
     <Link href={`/blog/${post.slug}`} className="group block">
       <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 flex flex-col h-full">
-        {/* Thumbnail */}
         <div className="relative w-full h-48 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden flex-shrink-0">
-          {post.thumbnail_url ? (
+          {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={post.thumbnail_url}
+              src={imageUrl}
               alt={post.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
@@ -120,7 +141,6 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
           )}
         </div>
 
-        {/* Content */}
         <div className="p-5 flex flex-col flex-1">
           <h3 className="font-bold text-slate-900 text-base leading-snug mb-2 group-hover:text-blue-600 transition-colors line-clamp-2">
             {post.title}
@@ -131,7 +151,6 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
             </p>
           )}
 
-          {/* Tags */}
           {post.tags && post.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-3">
               {post.tags.slice(0, 2).map(tag => (

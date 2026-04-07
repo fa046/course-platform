@@ -1,43 +1,30 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-export async function GET(request: NextRequest) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')
-  const tag = searchParams.get('tag')
-  const limit = parseInt(searchParams.get('limit') || '12')
   const page = parseInt(searchParams.get('page') || '1')
-  const featured = searchParams.get('featured') // for homepage
-
-  const supabase = await createClient()
+  const limit = parseInt(searchParams.get('limit') || '9')
+  const offset = (page - 1) * limit
 
   let query = supabase
     .from('blog_posts')
-    .select('id, title, slug, excerpt, thumbnail_url, category, tags, read_time, author_name, author_avatar, published_at, created_at')
+    .select('*')
     .eq('is_published', true)
-    .order('published_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
-  if (category && category !== 'all') {
+  if (category && category !== 'All') {
     query = query.eq('category', category)
   }
 
-  if (tag) {
-    query = query.contains('tags', [tag])
-  }
-
-  if (featured === 'true') {
-    query = query.limit(3)
-  } else {
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    query = query.range(from, to)
-  }
-
-  const { data, error, count } = await query
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ posts: data, count })
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ posts: data || [] })
 }

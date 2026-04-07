@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Course } from '@/lib/types'
 
+// Define the Pull Zone URL
+const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net';
+
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
@@ -12,11 +15,31 @@ export default function AdminCoursesPage() {
   const fetchCourses = () => {
     fetch('/api/admin/courses')
       .then(r => r.json())
-      .then(data => { setCourses(data.courses ?? []); setLoading(false) })
+      .then(data => { 
+        setCourses(data.courses ?? []); 
+        setLoading(false) 
+      })
       .catch(() => setLoading(false))
   }
 
   useEffect(() => { fetchCourses() }, [])
+
+  // --- IMAGE URL HELPER ---
+  const getImageUrl = (path: string | null) => {
+    if (!path) return null;
+    
+    // 1. Fix old storage URLs on the fly
+    if (path.includes('sg.storage.bunnycdn.com')) {
+      return path.replace('https://sg.storage.bunnycdn.com/smartlearn', BUNNY_PULL_ZONE);
+    }
+    
+    // 2. If it's a clean relative path, add the CDN domain
+    if (!path.startsWith('http')) {
+      return `${BUNNY_PULL_ZONE}/${path}`;
+    }
+    
+    return path;
+  };
 
   const handleDelete = async (slug: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
@@ -56,7 +79,7 @@ export default function AdminCoursesPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         {courses.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-400 text-sm">No courses yet.</p>
@@ -79,12 +102,20 @@ export default function AdminCoursesPage() {
                 <tr key={course.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      {course.thumbnail_url && (
-                        <img src={course.thumbnail_url} alt="" className="w-12 h-8 object-cover rounded" />
-                      )}
-                      <div>
-                        <p className="font-medium text-[#0F1F3D] text-sm">{course.title}</p>
-                        <p className="text-xs text-gray-400">{course.slug}</p>
+                      <div className="w-12 h-8 bg-gray-100 rounded overflow-hidden flex-shrink-0 border border-gray-100">
+                        {course.thumbnail_url ? (
+                          <img 
+                            src={getImageUrl(course.thumbnail_url) || ''} 
+                            alt="" 
+                            className="w-full h-full object-cover" 
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300">No Image</div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-[#0F1F3D] text-sm truncate">{course.title}</p>
+                        <p className="text-xs text-gray-400 truncate font-mono">{course.slug}</p>
                       </div>
                     </div>
                   </td>
@@ -109,20 +140,20 @@ export default function AdminCoursesPage() {
                       {course.is_published ? 'Published' : 'Draft'}
                     </button>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <Link href={`/admin/courses/${course.slug}/lessons`}
-                        className="text-xs text-purple-600 hover:text-purple-700 font-medium">
+                        className="text-xs text-purple-600 hover:text-purple-700 font-medium transition-colors">
                         Lessons
                       </Link>
                       <Link href={`/admin/courses/${course.slug}/edit`}
-                        className="text-xs text-[#2563EB] hover:text-[#1D4ED8] font-medium">
+                        className="text-xs text-[#2563EB] hover:text-[#1D4ED8] font-medium transition-colors">
                         Edit
                       </Link>
                       <button
                         onClick={() => handleDelete(course.slug, course.title)}
                         disabled={deleting === course.slug}
-                        className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-40">
+                        className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-40 transition-colors">
                         {deleting === course.slug ? 'Deleting...' : 'Delete'}
                       </button>
                     </div>
