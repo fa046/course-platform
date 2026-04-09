@@ -103,7 +103,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
       const data = await res.json()
       if (data.redirectUrl) window.location.href = data.redirectUrl
       else {
-        setError('Payment gateway not available.');
+        setError(data.error || 'Payment gateway not available.');
         setLoading(false)
       }
     } catch (e) {
@@ -129,7 +129,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
       const data = await res.json()
       if (data.checkoutUrl) window.location.href = data.checkoutUrl
       else {
-        setError('Payment gateway not available.');
+        setError(data.error || 'Payment gateway not available.');
         setLoading(false)
       }
     } catch (e) {
