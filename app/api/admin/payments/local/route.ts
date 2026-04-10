@@ -20,18 +20,20 @@ export async function GET() {
   const paymentsWithSignedUrls = await Promise.all(
     (data || []).map(async (payment) => {
       if (payment.proof_image_url) {
-        // Extract the file path from the URL
-        const url = new URL(payment.proof_image_url)
-        const filePath = url.pathname.split('/payment-proofs/')[1]
+        try {
+          // Extract just the filename from the full URL
+          const parts = payment.proof_image_url.split('/payment-proofs/')
+          const filePath = parts[parts.length - 1]
 
-        if (filePath) {
           const { data: signedData, error: signedError } = await supabase.storage
             .from('payment-proofs')
-            .createSignedUrl(`payment-proofs/${filePath}`, 3600) // 1 hour expiry
+            .createSignedUrl(`payment-proofs/${filePath}`, 3600)
 
           if (!signedError && signedData) {
             return { ...payment, proof_image_url: signedData.signedUrl }
           }
+        } catch (e) {
+          console.error('Signed URL error:', e)
         }
       }
       return payment
