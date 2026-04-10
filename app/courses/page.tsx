@@ -4,6 +4,20 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Course } from '@/lib/types'
 
+const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+
+function getFullImageUrl(path: string | null): string | null {
+  if (!path) return null
+  if (path.startsWith('http')) {
+    if (path.includes('.storage.bunnycdn.com')) {
+      const match = path.match(/\.storage\.bunnycdn\.com\/[^/]+\/(.+)/)
+      return match ? `${BUNNY_PULL_ZONE}/${match[1]}` : path
+    }
+    return path
+  }
+  return `${BUNNY_PULL_ZONE}/${path.replace(/^\//, '')}`
+}
+
 const levels = ['All', 'Beginner', 'Intermediate', 'Advanced']
 const categories = ['All', 'Design', 'Development', 'Marketing', 'Business']
 
@@ -20,21 +34,21 @@ export default function CoursesPage() {
   }, [showFreeOnly])
 
   async function fetchCourses() {
-  setLoading(true)
-  try {
-    const params = new URLSearchParams()
-    if (showFreeOnly) params.set('free', 'true')
-    const res = await fetch(`/api/courses?${params}`)
-    if (!res.ok) throw new Error('API error')
-    const data = await res.json()
-    setCourses(data.courses || [])
-  } catch (error) {
-    console.error('Failed to fetch courses:', error)
-    setCourses([])
-  } finally {
-    setLoading(false)
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (showFreeOnly) params.set('free', 'true')
+      const res = await fetch(`/api/courses?${params}`)
+      if (!res.ok) throw new Error('API error')
+      const data = await res.json()
+      setCourses(data.courses || [])
+    } catch (error) {
+      console.error('Failed to fetch courses:', error)
+      setCourses([])
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   const filtered = courses.filter(course => {
     const matchSearch = course.title.toLowerCase().includes(search.toLowerCase())
@@ -139,8 +153,12 @@ export default function CoursesPage() {
               <Link key={course.id} href={`/courses/${course.slug}`}
                 className="group bg-white border border-[#0F1F3D]/8 rounded-2xl overflow-hidden hover:border-[#2563EB]/30 hover:shadow-xl hover:shadow-[#2563EB]/8 transition-all hover:-translate-y-1">
                 <div className="aspect-video bg-gradient-to-br from-[#2563EB]/8 to-[#93C5FD]/15 relative flex items-center justify-center overflow-hidden">
-                  {course.thumbnail_url ? (
-                    <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                  {getFullImageUrl(course.thumbnail_url) ? (
+                    <img
+                      src={getFullImageUrl(course.thumbnail_url)!}
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-white/80 flex items-center justify-center shadow-sm">
                       <span className="text-[#2563EB] text-xl">▶</span>
@@ -162,7 +180,7 @@ export default function CoursesPage() {
                       <span className="text-emerald-600 font-semibold text-sm">Free</span>
                     ) : (
                       <div>
-                        <span className="text-[#0F1F3D] font-semibold text-sm">Rs. {course.price_pkr.toLocaleString()}</span>
+                        <span className="text-[#0F1F3D] font-semibold text-sm">Rs. {course.price_pkr?.toLocaleString()}</span>
                         <span className="text-[#64748B] text-xs ml-1">/ ${course.price_usd}</span>
                       </div>
                     )}

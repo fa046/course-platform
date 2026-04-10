@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { initializePaddle, Paddle } from '@paddle/paddle-js'
 import { Course, Lesson } from '@/lib/types'
 
 const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net';
@@ -85,7 +84,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
     }
   }
 
-  async function handleSafepayPayment() {
+  async function handleLocalPayment() {
     setLoading(true)
     setError(null)
     try {
@@ -116,7 +115,6 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
     setLoading(true)
     setError(null)
     try {
-      // 1. Create transaction on backend
       const res = await fetch('/api/payments/paddle/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,35 +127,15 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
       })
       const data = await res.json()
 
-      if (!data.transactionId) {
+      if (!data.checkoutUrl) {
         setError(data.error || 'Payment gateway not available.')
         setLoading(false)
         return
       }
 
-      // 2. Initialize Paddle and open inline checkout
-      const paddle = await initializePaddle({
-        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as 'sandbox' | 'production') || 'sandbox',
-        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
-      })
+      // Redirect to Paddle hosted checkout page
+      window.location.href = data.checkoutUrl
 
-      if (!paddle) {
-        setError('Failed to load payment system. Please try again.')
-        setLoading(false)
-        return
-      }
-
-      paddle.Checkout.open({
-        transactionId: data.transactionId,
-        settings: {
-          displayMode: 'overlay',
-          theme: 'light',
-          locale: 'en',
-          successUrl: `${window.location.origin}/payment/success?course=${course.id}`,
-        },
-      })
-
-      setLoading(false)
     } catch (e) {
       setError('Payment failed. Please try again.')
       setLoading(false)
@@ -300,20 +278,26 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
             <div className="p-6 space-y-4">
               <div className="bg-[#F8F9FF] rounded-xl p-4 flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-[#64748B]">Total Amount</div>
-                  <div className="text-2xl font-bold text-[#0F1F3D]">Rs. {course.price_pkr.toLocaleString()}</div>
+                  <div className="text-xs text-[#64748B]">Hi {form.fullName.split(' ')[0]} 👋 Choose how you'd like to pay:</div>
+                  <div className="text-2xl font-bold text-[#0F1F3D] mt-1">Rs. {course.price_pkr.toLocaleString()}</div>
                 </div>
                 <div className="text-right text-gray-400 text-sm font-semibold">${course.price_usd} USD</div>
               </div>
 
               <div className="space-y-3">
                 <button
-                  onClick={handleSafepayPayment}
+                  onClick={handleLocalPayment}
                   disabled={loading}
                   className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all disabled:opacity-60"
                 >
-                  <span className="block font-bold text-sm">Pay in PKR</span>
-                  <span className="text-xs text-gray-500">Easypaisa · JazzCash · Bank Transfer</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-sm font-bold text-green-700">PK</div>
+                    <div>
+                      <span className="block font-bold text-sm">Pay in PKR</span>
+                      <span className="text-xs text-gray-500">JazzCash · Easypaisa · Bank Transfer</span>
+                      <span className="block text-xs font-semibold text-[#0F1F3D] mt-0.5">Rs. {course.price_pkr.toLocaleString()}</span>
+                    </div>
+                  </div>
                 </button>
 
                 <button
@@ -321,19 +305,27 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                   disabled={loading}
                   className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all disabled:opacity-60"
                 >
-                  <span className="block font-bold text-sm">
-                    {loading ? 'Loading checkout...' : 'Pay Internationally'}
-                  </span>
-                  <span className="text-xs text-gray-500">Visa · Mastercard · PayPal · Google Pay</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg">💳</div>
+                    <div>
+                      <span className="block font-bold text-sm">
+                        {loading ? 'Loading checkout...' : 'Pay by Card'}
+                      </span>
+                      <span className="text-xs text-gray-500">Visa · Mastercard · Apple Pay · Google Pay · PayPal</span>
+                      <span className="block text-xs font-semibold text-[#0F1F3D] mt-0.5">${course.price_usd} USD</span>
+                    </div>
+                  </div>
                 </button>
               </div>
+
+              <p className="text-center text-xs text-gray-400">🔒 Secure payment. 30-day money-back guarantee.</p>
 
               <button
                 onClick={() => setStep('info')}
                 disabled={loading}
                 className="w-full text-sm text-gray-400 py-2 hover:text-gray-600 disabled:opacity-40"
               >
-                ← Back
+                ← Edit your information
               </button>
             </div>
           )}
