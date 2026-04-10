@@ -67,14 +67,14 @@ export async function POST(request: Request) {
         items: [{ price_id: course.paddle_price_id, quantity: 1 }],
         customer: { email: customerEmail, name: customerName },
         custom_data: { user_id: userId, course_id: courseId, customer_phone: customerPhone || '' },
-        checkout: { url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?course=${courseId}` },
+        //checkout: { url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?course=${courseId}` },
       }),
     })
 
     if (!paddleRes.ok) {
       const err = await paddleRes.json()
-      console.error('Paddle API error:', err)
-      return NextResponse.json({ error: 'Failed to create payment session' }, { status: 500 })
+      console.error('Paddle API error:', JSON.stringify(err, null, 2))
+      return NextResponse.json({ error: err?.error?.detail || err?.error?.code || 'Failed to create payment session' }, { status: 500 })
     }
 
     const paddleData = await paddleRes.json()
