@@ -16,18 +16,16 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Generate signed URLs for proof images
   const paymentsWithSignedUrls = await Promise.all(
     (data || []).map(async (payment) => {
       if (payment.proof_image_url) {
         try {
-          // Extract just the filename from the full URL
-          const parts = payment.proof_image_url.split('/payment-proofs/')
+          const parts = payment.proof_image_url.split('/object/public/payment-proofs/')
           const filePath = parts[parts.length - 1]
 
           const { data: signedData, error: signedError } = await supabase.storage
             .from('payment-proofs')
-            .createSignedUrl(`payment-proofs/${filePath}`, 3600)
+            .createSignedUrl(filePath, 3600)
 
           if (!signedError && signedData) {
             return { ...payment, proof_image_url: signedData.signedUrl }
