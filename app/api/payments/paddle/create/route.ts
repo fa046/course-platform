@@ -48,13 +48,13 @@ export async function POST(request: Request) {
 
     // Save enrollment intent with student info (phone/name)
     // This upserts so if they come back the data is updated
-    await supabase.from('enrollments').upsert({
-      user_id: userId,
-      course_id: courseId,
-      full_name: customerName || null,
-      phone: customerPhone || null,
-    }, { onConflict: 'user_id,course_id', ignoreDuplicates: false })
-    .then(() => {}) // ignore error — will be properly set after payment completes
+    // await supabase.from('enrollments').upsert({
+    //   user_id: userId,
+    //   course_id: courseId,
+    //   full_name: customerName || null,
+    //   phone: customerPhone || null,
+    // }, { onConflict: 'user_id,course_id', ignoreDuplicates: false })
+    //.then(() => {}) // ignore error — will be properly set after payment completes
 
     const apiKey = process.env.PADDLE_API_KEY
     const env = process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox'
