@@ -1,8 +1,9 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // POST /api/payments/local/upload-proof
-// Uploads payment proof image to Bunny Storage
+// Uploads payment proof image to Supabase Storage
 // Returns the public URL
 export async function POST(request: Request) {
   try {
@@ -35,45 +36,32 @@ export async function POST(request: Request) {
       )
     }
 
-    const storageZone = process.env.BUNNY_STORAGE_ZONE_NAME
-    const storageApiKey = process.env.BUNNY_STORAGE_API_KEY
-    const cdnHostname = process.env.BUNNY_STORAGE_CDN_HOSTNAME
-
-    if (!storageZone || !storageApiKey || !cdnHostname) {
-      return NextResponse.json(
-        { error: 'File storage not configured' },
-        { status: 500 }
-      )
-    }
-
     // Generate unique filename
     const ext = file.name.split('.').pop() || 'jpg'
     const filename = `payment-proofs/${userId}-${Date.now()}.${ext}`
 
     const buffer = await file.arrayBuffer()
+    const supabase = createAdminClient()
 
-    // Upload to Bunny Storage
-    const uploadRes = await fetch(
-      `https://storage.bunnycdn.com/${storageZone}/${filename}`,
-      {
-        method: 'PUT',
-        headers: {
-          AccessKey: storageApiKey,
-          'Content-Type': file.type,
-        },
-        body: buffer,
-      }
-    )
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('payment-proofs')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        upsert: false,
+      })
 
-    if (!uploadRes.ok) {
-      const err = await uploadRes.text()
-      console.error('Bunny Storage upload error:', err)
+    if (uploadError) {
+      console.error('Supabase Storage upload error:', uploadError)
       return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
     }
 
-    const publicUrl = `https://${cdnHostname}/${filename}`
+    // Get public URL
+    const { data } = supabase.storage
+      .from('payment-proofs')
+      .getPublicUrl(filename)
 
-    return NextResponse.json({ url: publicUrl })
+    return NextResponse.json({ url: data.publicUrl })
   } catch (error) {
     console.error('Upload proof error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

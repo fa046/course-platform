@@ -16,11 +16,12 @@ type LessonForm = {
   file_url: string
   duration_seconds: number
   is_free: boolean
+  section_id: string
 }
 
 const emptyForm: LessonForm = {
   title: '', description: '', content_type: 'video',
-  bunny_video_id: '', file_url: '', duration_seconds: 0, is_free: false,
+  bunny_video_id: '', file_url: '', duration_seconds: 0, is_free: false, section_id: '',
 }
 
 export default function LessonsPage() {
@@ -33,6 +34,7 @@ export default function LessonsPage() {
   const [form, setForm] = useState<LessonForm>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [sections, setSections] = useState<{ id: string; title: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStatus, setUploadStatus] = useState('')
@@ -54,10 +56,15 @@ export default function LessonsPage() {
   };
 
   const fetchLessons = async () => {
-    const r = await fetch(`/api/admin/lessons/${slug}`)
-    const data = await r.json()
-    setLessons(data.lessons ?? [])
-    setCourseTitle(data.courseTitle ?? '')
+    const [lessonsRes, sectionsRes] = await Promise.all([
+      fetch(`/api/admin/lessons/${slug}`),
+      fetch(`/api/admin/courses/${slug}`),
+    ])
+    const lessonsData = await lessonsRes.json()
+    const courseData = await sectionsRes.json()
+    setLessons(lessonsData.lessons ?? [])
+    setCourseTitle(lessonsData.courseTitle ?? '')
+    setSections(courseData.course?.sections ?? [])
     setLoading(false)
   }
 
@@ -75,6 +82,7 @@ export default function LessonsPage() {
       file_url: lesson.file_url ?? '',
       duration_seconds: lesson.duration_seconds,
       is_free: lesson.is_free,
+      section_id: lesson.section_id ?? '',
     })
     setShowForm(true)
   }
@@ -280,6 +288,20 @@ export default function LessonsPage() {
                   rows={2} placeholder="Brief description..."
                   className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] resize-none" />
               </div>
+
+              {sections.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Section</label>
+                  <select value={form.section_id}
+                    onChange={e => setForm(f => ({ ...f, section_id: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] bg-white">
+                    <option value="">— No section —</option>
+                    {sections.map(s => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Content Type</label>

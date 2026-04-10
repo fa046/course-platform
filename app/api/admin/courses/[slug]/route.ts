@@ -15,7 +15,12 @@ export async function GET(_req: Request, { params }: Params) {
   const supabase = createAdminClient()
   const { data: course, error } = await supabase.from('courses').select('*').eq('slug', slug).single()
   if (error || !course) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
-  return NextResponse.json({ course })
+  const { data: sections } = await supabase
+    .from('course_sections')
+    .select('id, title, position')
+    .eq('course_id', course.id)
+    .order('position', { ascending: true })
+  return NextResponse.json({ course: { ...course, sections: sections ?? [] } })
 }
 
 export async function PUT(request: Request, { params }: Params) {
@@ -30,7 +35,10 @@ export async function PUT(request: Request, { params }: Params) {
     const { data: existing } = await supabase.from('courses').select('id').eq('slug', newSlug).single()
     if (existing) return NextResponse.json({ error: 'Slug already in use' }, { status: 400 })
   }
-  const { data, error } = await supabase.from('courses').update({ title, slug: newSlug, description, thumbnail_url, price_pkr, price_usd, is_free, is_published, paddle_price_id, related_blog_url }).eq('slug', slug).select().single()
+  const { data, error } = await supabase.from('courses').update({
+    title, slug: newSlug, description, thumbnail_url, price_pkr, price_usd,
+    is_free, is_published, paddle_price_id, related_blog_url,
+  }).eq('slug', slug).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ course: data })
 }

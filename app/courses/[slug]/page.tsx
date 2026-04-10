@@ -593,9 +593,18 @@ export default function CoursePage() {
 
   const previewLesson = previewLessonId ? course.lessons?.find(l => l.id === previewLessonId) : null
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_STREAM_LIBRARY_ID
+  const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+  const getPreviewFileUrl = (path: string | null) => {
+    if (!path) return null
+    if (path.includes('sg.storage.bunnycdn.com')) return path.replace('https://sg.storage.bunnycdn.com/smartlearn', BUNNY_URL)
+    if (!path.startsWith('http')) return `${BUNNY_URL}/${path}`
+    return path
+  }
+  const previewContentType = previewLesson?.content_type || 'video'
   const previewEmbedUrl = previewLesson?.bunny_video_id && libraryId
     ? `https://iframe.mediadelivery.net/embed/${libraryId}/${previewLesson.bunny_video_id}?autoplay=true`
     : previewLesson?.video_url || null
+  const previewFileUrl = getPreviewFileUrl(previewLesson?.file_url || null)
 
   return (
     <main className="min-h-screen bg-[#F8F9FF]">
@@ -747,9 +756,29 @@ export default function CoursePage() {
               </div>
             </div>
             <div className="aspect-video bg-black">
-              {previewEmbedUrl
-                ? <iframe src={previewEmbedUrl} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen />
-                : <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">Video coming soon</div>}
+              {previewContentType === 'video'
+                ? previewEmbedUrl
+                  ? <iframe src={previewEmbedUrl} className="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen />
+                  : <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">Video coming soon</div>
+                : previewContentType === 'pdf' && previewFileUrl
+                  ? <div className="w-full h-full flex flex-col bg-[#060D1F]">
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 flex-shrink-0">
+                        <span className="text-xs text-white/40">PDF Preview</span>
+                        <div className="flex gap-2">
+                          <a href={previewFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-white/40 hover:text-white bg-white/10 px-3 py-1 rounded-lg">Open ↗</a>
+                          <a href={previewFileUrl} download className="text-xs text-white/40 hover:text-white bg-white/10 px-3 py-1 rounded-lg">↓ Download</a>
+                        </div>
+                      </div>
+                      <iframe src={`${previewFileUrl}#toolbar=1&navpanes=0`} className="w-full flex-1 border-0" />
+                    </div>
+                  : previewFileUrl
+                    ? <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-[#060D1F]">
+                        <div className="text-5xl">📎</div>
+                        <p className="text-white/50 text-sm">{previewLesson?.title}</p>
+                        <a href={previewFileUrl} download target="_blank" rel="noopener noreferrer"
+                          className="bg-[#2563EB] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-500 transition-colors">↓ Download File</a>
+                      </div>
+                    : <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">Content coming soon</div>}
             </div>
             <div className="px-5 py-4"><p className="text-white/70 text-sm">{previewLesson.title}</p></div>
           </div>
