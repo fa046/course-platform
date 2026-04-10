@@ -121,9 +121,9 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           courseId: course.id,
-          priceId: course.id,
           customerEmail: form.email,
           customerName: form.fullName,
+          customerPhone: form.phone,  // ✅ add this
         }),
       })
       const data = await res.json()
