@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { initializePaddle, Paddle } from '@paddle/paddle-js'
 import { Course, Lesson } from '@/lib/types'
 
 const BUNNY_URL = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net';
@@ -11,7 +12,7 @@ interface EnrollmentModalProps {
   user: any
   onClose: () => void
   onSuccess: () => void
-  initialPreviewLesson?: Lesson | null // New prop to open a specific lesson
+  initialPreviewLesson?: Lesson | null
 }
 
 type Step = 'info' | 'payment' | 'preview'
@@ -29,7 +30,6 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // --- HELPER TO GET PUBLIC URL ---
   const getFullUrl = (path: string | null) => {
     if (!path) return "";
     if (path.includes('sg.storage.bunnycdn.com')) {
@@ -103,11 +103,11 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
       const data = await res.json()
       if (data.redirectUrl) window.location.href = data.redirectUrl
       else {
-        setError(data.error || 'Payment gateway not available.');
+        setError(data.error || 'Payment gateway not available.')
         setLoading(false)
       }
     } catch (e) {
-      setError('Payment failed.');
+      setError('Payment failed.')
       setLoading(false)
     }
   }
@@ -116,6 +116,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
     setLoading(true)
     setError(null)
     try {
+      // 1. Create transaction on backend
       const res = await fetch('/api/payments/paddle/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,17 +124,42 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
           courseId: course.id,
           customerEmail: form.email,
           customerName: form.fullName,
-          customerPhone: form.phone,  // ✅ add this
+          customerPhone: form.phone,
         }),
       })
       const data = await res.json()
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl
-      else {
-        setError(data.error || 'Payment gateway not available.');
+
+      if (!data.transactionId) {
+        setError(data.error || 'Payment gateway not available.')
         setLoading(false)
+        return
       }
+
+      // 2. Initialize Paddle and open inline checkout
+      const paddle = await initializePaddle({
+        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as 'sandbox' | 'production') || 'sandbox',
+        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
+      })
+
+      if (!paddle) {
+        setError('Failed to load payment system. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      paddle.Checkout.open({
+        transactionId: data.transactionId,
+        settings: {
+          displayMode: 'overlay',
+          theme: 'light',
+          locale: 'en',
+          successUrl: `${window.location.origin}/payment/success?course=${course.id}`,
+        },
+      })
+
+      setLoading(false)
     } catch (e) {
-      setError('Payment failed.');
+      setError('Payment failed. Please try again.')
       setLoading(false)
     }
   }
@@ -163,7 +189,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
           </button>
         </div>
 
-        {/* Progress bar (hidden in preview) */}
+        {/* Progress bar */}
         {step !== 'preview' && (
           <div className="h-0.5 bg-[#0F1F3D]/8">
             <div
@@ -195,7 +221,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                   </div>
                 )}
               </div>
-              
+
               <div className="flex-1 bg-gray-50 border-l border-gray-100 p-6 flex flex-col justify-between">
                 <div>
                   <h3 className="font-bold text-[#0F1F3D] text-lg mb-2">Enjoying this lesson?</h3>
@@ -203,7 +229,6 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                     Enroll now to unlock the full course, assignments, and get your certificate.
                   </p>
                 </div>
-                
                 <div className="space-y-3">
                   <button
                     onClick={() => setStep('info')}
@@ -234,6 +259,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                   onChange={e => setForm({ ...form, fullName: e.target.value })}
                   className={`w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#2563EB]/10 outline-none ${errors.fullName ? 'border-red-400' : 'border-[#0F1F3D]/15'}`}
                 />
+                {errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}
               </div>
 
               <div>
@@ -244,6 +270,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   className={`w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#2563EB]/10 outline-none ${errors.email ? 'border-red-400' : 'border-[#0F1F3D]/15'}`}
                 />
+                {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
               </div>
 
               <div>
@@ -255,12 +282,13 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                   placeholder="03XX XXXXXXX"
                   className={`w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#2563EB]/10 outline-none ${errors.phone ? 'border-red-400' : 'border-[#0F1F3D]/15'}`}
                 />
+                {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
               </div>
 
               <button
                 onClick={course.is_free ? handleFreeCourseEnroll : handleNext}
                 disabled={loading}
-                className={`w-full py-4 text-white font-semibold rounded-xl transition-all mt-2 ${course.is_free ? 'bg-emerald-600' : 'bg-[#2563EB]'}`}
+                className={`w-full py-4 text-white font-semibold rounded-xl transition-all mt-2 disabled:opacity-60 ${course.is_free ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563EB] hover:bg-blue-600'}`}
               >
                 {loading ? 'Processing...' : course.is_free ? 'Enroll for Free →' : 'Continue to Payment →'}
               </button>
@@ -275,21 +303,38 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                   <div className="text-xs text-[#64748B]">Total Amount</div>
                   <div className="text-2xl font-bold text-[#0F1F3D]">Rs. {course.price_pkr.toLocaleString()}</div>
                 </div>
-                <div className="text-right text-gray-400 text-sm font-semibold">${course.price_usd}</div>
+                <div className="text-right text-gray-400 text-sm font-semibold">${course.price_usd} USD</div>
               </div>
 
               <div className="space-y-3">
-                <button onClick={handleSafepayPayment} disabled={loading} className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all">
+                <button
+                  onClick={handleSafepayPayment}
+                  disabled={loading}
+                  className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all disabled:opacity-60"
+                >
                   <span className="block font-bold text-sm">Pay in PKR</span>
-                  <span className="text-xs text-gray-500">Easypaisa, JazzCash, Card</span>
+                  <span className="text-xs text-gray-500">Easypaisa · JazzCash · Bank Transfer</span>
                 </button>
-                <button onClick={handlePaddlePayment} disabled={loading} className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all">
-                  <span className="block font-bold text-sm">Pay Internationally</span>
-                  <span className="text-xs text-gray-500">PayPal, Google Pay, Card</span>
+
+                <button
+                  onClick={handlePaddlePayment}
+                  disabled={loading}
+                  className="w-full p-4 border-2 rounded-xl border-gray-100 hover:border-[#2563EB] text-left transition-all disabled:opacity-60"
+                >
+                  <span className="block font-bold text-sm">
+                    {loading ? 'Loading checkout...' : 'Pay Internationally'}
+                  </span>
+                  <span className="text-xs text-gray-500">Visa · Mastercard · PayPal · Google Pay</span>
                 </button>
               </div>
 
-              <button onClick={() => setStep('info')} className="w-full text-sm text-gray-400 py-2">← Back</button>
+              <button
+                onClick={() => setStep('info')}
+                disabled={loading}
+                className="w-full text-sm text-gray-400 py-2 hover:text-gray-600 disabled:opacity-40"
+              >
+                ← Back
+              </button>
             </div>
           )}
         </div>

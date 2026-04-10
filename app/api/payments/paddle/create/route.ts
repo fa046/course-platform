@@ -96,7 +96,10 @@ export async function POST(request: Request) {
       metadata: { transaction_id: paddleData.data?.id, customer_name: customerName, customer_phone: customerPhone },
     })
 
-    return NextResponse.json({ checkoutUrl })
+    return NextResponse.json({ 
+      checkoutUrl,
+      transactionId: paddleData.data?.id
+    })
   } catch (error) {
     console.error('Paddle create error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
