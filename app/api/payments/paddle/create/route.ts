@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        status: 'ready',
         items: [{ price_id: course.paddle_price_id, quantity: 1 }],
         customer: { email: customerEmail, name: customerName },
         custom_data: { user_id: userId, course_id: courseId, customer_phone: customerPhone || '' },
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     }
 
     // Build the hosted checkout URL from transaction ID
-    const checkoutUrl = `${checkoutBase}/checkout/custom/${transactionId}`
+    const checkoutUrl = paddleData.data?.checkout?.url
 
     // Save pending payment record
     await supabase.from('payments').insert({
