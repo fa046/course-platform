@@ -46,19 +46,10 @@ export async function POST(request: Request) {
       }, { onConflict: 'id' })
     }
 
-    // Save enrollment intent with student info (phone/name)
-    // This upserts so if they come back the data is updated
-    // await supabase.from('enrollments').upsert({
-    //   user_id: userId,
-    //   course_id: courseId,
-    //   full_name: customerName || null,
-    //   phone: customerPhone || null,
-    // }, { onConflict: 'user_id,course_id', ignoreDuplicates: false })
-    //.then(() => {}) // ignore error — will be properly set after payment completes
-
     const apiKey = process.env.PADDLE_API_KEY
     const env = process.env.NEXT_PUBLIC_PADDLE_ENV || 'sandbox'
     const baseUrl = env === 'production' ? 'https://api.paddle.com' : 'https://sandbox-api.paddle.com'
+    const checkoutBase = env === 'production' ? 'https://buy.paddle.com' : 'https://sandbox-buy.paddle.com'
 
     const paddleRes = await fetch(`${baseUrl}/transactions`, {
       method: 'POST',
@@ -67,7 +58,6 @@ export async function POST(request: Request) {
         items: [{ price_id: course.paddle_price_id, quantity: 1 }],
         customer: { email: customerEmail, name: customerName },
         custom_data: { user_id: userId, course_id: courseId, customer_phone: customerPhone || '' },
-        checkout: { url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?course=${courseId}` },
       }),
     })
 
@@ -78,11 +68,14 @@ export async function POST(request: Request) {
     }
 
     const paddleData = await paddleRes.json()
-    const checkoutUrl = paddleData.data?.checkout?.url
+    const transactionId = paddleData.data?.id
 
-    if (!checkoutUrl) {
-      return NextResponse.json({ error: 'No checkout URL from Paddle' }, { status: 500 })
+    if (!transactionId) {
+      return NextResponse.json({ error: 'No transaction ID from Paddle' }, { status: 500 })
     }
+
+    // Build the hosted checkout URL from transaction ID
+    const checkoutUrl = `${checkoutBase}/checkout/custom/${transactionId}`
 
     // Save pending payment record
     await supabase.from('payments').insert({
@@ -92,13 +85,13 @@ export async function POST(request: Request) {
       currency: 'USD',
       gateway: 'paddle',
       status: 'pending',
-      gateway_payment_id: paddleData.data?.id,
-      metadata: { transaction_id: paddleData.data?.id, customer_name: customerName, customer_phone: customerPhone },
+      gateway_payment_id: transactionId,
+      metadata: { transaction_id: transactionId, customer_name: customerName, customer_phone: customerPhone },
     })
 
     return NextResponse.json({ 
       checkoutUrl,
-      transactionId: paddleData.data?.id
+      transactionId,
     })
   } catch (error) {
     console.error('Paddle create error:', error)
