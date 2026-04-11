@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     // Build the hosted checkout URL from transaction ID
-    const checkoutUrl = `${checkoutBase}/checkout/custom/${transactionId}`
+    const checkoutUrl = paddleData.data?.checkout?.url
 
     // Save pending payment record
     await supabase.from('payments').insert({
