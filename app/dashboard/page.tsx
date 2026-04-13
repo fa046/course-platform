@@ -19,6 +19,20 @@ type EnrolledCourse = {
 }
 
 export default function DashboardPage() {
+
+ const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+
+function getFullImageUrl(path: string | null): string | null {
+  if (!path) return null
+  if (path.startsWith('http')) {
+    if (path.includes('.storage.bunnycdn.com')) {
+      const match = path.match(/\.storage\.bunnycdn\.com\/[^/]+\/(.+)/)
+      return match ? `${BUNNY_PULL_ZONE}/${match[1]}` : path
+    }
+    return path
+  }
+  return `${BUNNY_PULL_ZONE}/${path.replace(/^\//, '')}`
+}
   const { user, isLoaded } = useUser()
   const router = useRouter()
   const [courses, setCourses] = useState<EnrolledCourse[]>([])
@@ -128,8 +142,8 @@ export default function DashboardPage() {
 
                 {/* Thumbnail */}
                 <div className="aspect-video bg-gradient-to-br from-[#2563EB]/10 to-[#93C5FD]/20 relative overflow-hidden">
-                  {course.thumbnail_url
-                    ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                  {getFullImageUrl(course.thumbnail_url)
+                    ? <img src={getFullImageUrl(course.thumbnail_url)!} alt={course.title} className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center text-[#2563EB] text-3xl">▶</div>}
 
                   {/* Completion badge */}
