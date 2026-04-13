@@ -141,7 +141,7 @@ function PaymentPicker({
             <div className="w-12 h-12 bg-[#2563EB]/10 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">🇵🇰</div>
             <div>
               <p className="font-semibold text-[#0F1F3D] group-hover:text-[#2563EB] transition-colors">Pay in PKR</p>
-              <p className="text-xs text-[#64748B] mt-0.5">JazzCash · Easypaisa · Bank Transfer</p>
+              <p className="text-xs text-[#64748B] mt-0.5">Click to explore options</p>
               <p className="text-sm font-bold text-[#0F1F3D] mt-1">Rs. {course.price_pkr.toLocaleString()}</p>
             </div>
           </button>
