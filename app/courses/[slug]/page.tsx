@@ -51,7 +51,6 @@ function StudentInfoForm({
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10">✕</button>
         </div>
-        {/* Progress indicator */}
         <div className="h-0.5 bg-[#0F1F3D]/8"><div className="h-full bg-[#2563EB] w-1/2" /></div>
         <div className="p-6">
           <p className="text-sm text-[#64748B] mb-5">
@@ -134,12 +133,9 @@ function PaymentPicker({
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10">✕</button>
         </div>
-        {/* Progress indicator */}
         <div className="h-0.5 bg-[#0F1F3D]/8"><div className="h-full bg-[#2563EB] w-full" /></div>
         <div className="p-6 space-y-3">
           <p className="text-sm text-[#64748B] mb-1">Hi {studentData.name.split(' ')[0]} 👋 Choose how you'd like to pay:</p>
-
-          {/* Local payment */}
           <button onClick={() => setSelected('local')}
             className="w-full flex items-center gap-4 p-5 border-2 border-[#0F1F3D]/10 rounded-xl hover:border-[#2563EB] hover:bg-[#EFF6FF] transition-all text-left group">
             <div className="w-12 h-12 bg-[#2563EB]/10 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">🇵🇰</div>
@@ -149,8 +145,6 @@ function PaymentPicker({
               <p className="text-sm font-bold text-[#0F1F3D] mt-1">Rs. {course.price_pkr.toLocaleString()}</p>
             </div>
           </button>
-
-          {/* International / card */}
           <button onClick={() => setSelected('international')}
             className="w-full flex items-center gap-4 p-5 border-2 border-[#0F1F3D]/10 rounded-xl hover:border-[#2563EB] hover:bg-[#EFF6FF] transition-all text-left group">
             <div className="w-12 h-12 bg-[#2563EB]/10 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">💳</div>
@@ -160,7 +154,6 @@ function PaymentPicker({
               <p className="text-sm font-bold text-[#0F1F3D] mt-1">${course.price_usd} USD</p>
             </div>
           </button>
-
           <p className="text-xs text-center text-[#94A3B8] pt-1">🔒 Secure payment. 30-day money-back guarantee.</p>
           <button onClick={onBack} className="w-full text-sm text-[#64748B] hover:text-[#0F1F3D] transition-colors py-2 text-center">← Edit your information</button>
         </div>
@@ -229,6 +222,21 @@ function PaddleFlow({ course, studentData, onClose, onBack }: {
 }
 
 // ─── Local Payment Flow ───────────────────────────────────────────────────────
+type PaymentSetting = {
+  method: string
+  account_name: string | null
+  account_number: string | null
+  iban: string | null
+  bank_name: string | null
+  is_active: boolean
+}
+
+const METHOD_META: Record<string, { title: string; note: string; emoji: string }> = {
+  jazzcash: { title: 'JazzCash', note: 'Send via JazzCash Mobile Account', emoji: '💜' },
+  easypaisa: { title: 'Easypaisa', note: 'Send via Easypaisa Mobile Account or OTC', emoji: '💚' },
+  bank_transfer: { title: 'Bank Transfer', note: 'Transfer via bank', emoji: '🏦' },
+}
+
 function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {
   course: Course
   studentData: { name: string; email: string; phone: string; city: string }
@@ -237,20 +245,35 @@ function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {
   onSuccess: () => void
 }) {
   const [step, setStep] = useState<'method' | 'proof' | 'done'>('method')
-  const [method, setMethod] = useState<'jazzcash' | 'easypaisa' | 'bank_transfer' | null>(null)
+  const [method, setMethod] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [txId, setTxId] = useState('')
   const [proofFile, setProofFile] = useState<File | null>(null)
   const [proofPreview, setProofPreview] = useState<string | null>(null)
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSetting[]>([])
+  const [settingsLoading, setSettingsLoading] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // REPLACE with real numbers before going live
-  const methods: Record<string, { number: string; title: string; note: string; emoji: string }> = {
-    jazzcash: { number: '0300-0000000', title: 'JazzCash', note: 'Send via JazzCash Mobile Account', emoji: '💜' },
-    easypaisa: { number: '0300-0000000', title: 'Easypaisa', note: 'Send via Easypaisa Mobile Account or OTC', emoji: '💚' },
-    bank_transfer: { number: 'IBAN: PK00XXXX0000000000000000', title: 'Bank Transfer', note: 'Transfer to HBL / Meezan Bank', emoji: '🏦' },
+  useEffect(() => {
+    fetch('/api/payment-settings')
+      .then(r => r.json())
+      .then(data => {
+        setPaymentSettings(data.settings || [])
+        setSettingsLoading(false)
+      })
+      .catch(() => setSettingsLoading(false))
+  }, [])
+
+  function getDisplayNumber(s: PaymentSetting) {
+    if (s.method === 'bank_transfer') return s.iban || 'Contact admin for bank details'
+    return s.account_number || 'Contact admin for account details'
+  }
+
+  function getNote(s: PaymentSetting) {
+    if (s.method === 'bank_transfer') return s.bank_name ? `Transfer to ${s.bank_name}` : METHOD_META.bank_transfer.note
+    return METHOD_META[s.method]?.note || ''
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -289,6 +312,8 @@ function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {
     } catch { setError('Something went wrong. Please try again.'); setLoading(false); setUploading(false) }
   }
 
+  const selectedSetting = paymentSettings.find(s => s.method === method)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1F3D]/75 backdrop-blur-sm">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -306,18 +331,28 @@ function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {
           {step === 'method' && (
             <div>
               <p className="text-sm text-[#64748B] mb-4">Choose payment method:</p>
-              <div className="space-y-3 mb-5">
-                {Object.entries(methods).map(([k, m]) => (
-                  <button key={k} onClick={() => { setMethod(k as any); setStep('proof') }}
-                    className="w-full flex items-center gap-4 p-4 border-2 border-[#0F1F3D]/10 rounded-xl hover:border-[#2563EB] hover:bg-[#EFF6FF] transition-all text-left group">
-                    <span className="text-2xl">{m.emoji}</span>
-                    <div>
-                      <p className="font-semibold text-sm text-[#0F1F3D] group-hover:text-[#2563EB]">{m.title}</p>
-                      <p className="text-xs text-[#64748B]">{m.note}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {settingsLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
+                </div>
+              ) : (
+                <div className="space-y-3 mb-5">
+                  {paymentSettings.map(s => {
+                    const meta = METHOD_META[s.method] || { title: s.method, note: '', emoji: '💳' }
+                    return (
+                      <button key={s.method} onClick={() => { setMethod(s.method); setStep('proof') }}
+                        className="w-full flex items-center gap-4 p-4 border-2 border-[#0F1F3D]/10 rounded-xl hover:border-[#2563EB] hover:bg-[#EFF6FF] transition-all text-left group">
+                        <span className="text-2xl">{meta.emoji}</span>
+                        <div>
+                          <p className="font-semibold text-sm text-[#0F1F3D] group-hover:text-[#2563EB]">{meta.title}</p>
+                          {s.account_name && <p className="text-xs text-[#64748B]">{s.account_name}</p>}
+                          <p className="text-xs text-[#64748B]">{getNote(s)}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 mb-3">
                 ⏱ Access granted within 24 hours after verification
               </div>
@@ -326,13 +361,16 @@ function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {
           )}
 
           {/* Step: show number + upload proof */}
-          {step === 'proof' && method && (
+          {step === 'proof' && method && selectedSetting && (
             <div>
               <div className="p-4 bg-[#F8F9FF] border border-[#0F1F3D]/8 rounded-xl mb-5">
                 <p className="text-xs font-semibold text-[#0F1F3D]/50 uppercase tracking-wider mb-1">Send to</p>
-                <p className="text-xl font-bold text-[#0F1F3D] font-mono mb-1">{methods[method].number}</p>
+                {selectedSetting.account_name && (
+                  <p className="text-sm text-[#64748B] mb-1">{selectedSetting.account_name}</p>
+                )}
+                <p className="text-xl font-bold text-[#0F1F3D] font-mono mb-1">{getDisplayNumber(selectedSetting)}</p>
                 <p className="text-sm font-bold text-[#2563EB] mb-1">Rs. {course.price_pkr.toLocaleString()}</p>
-                <p className="text-xs text-[#64748B]">{methods[method].note}</p>
+                <p className="text-xs text-[#64748B]">{getNote(selectedSetting)}</p>
               </div>
               <p className="text-sm font-semibold text-[#0F1F3D] mb-3">After sending, upload proof below:</p>
               <div className="space-y-4">
@@ -395,7 +433,7 @@ function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {
   )
 }
 
-// ─── Free Enroll handler (uses student data to auto-enroll) ───────────────────
+// ─── Free Enroll handler ──────────────────────────────────────────────────────
 async function enrollFree(courseId: string, studentData: { name: string; phone: string; city: string }) {
   const res = await fetch('/api/enroll', {
     method: 'POST',
@@ -473,7 +511,6 @@ export default function CoursePage() {
   const [courseComplete, setCourseComplete] = useState(false)
   const [enrollLoading, setEnrollLoading] = useState(false)
 
-  // Modal state machine: none → info_form → payment_picker (paid) OR auto-enroll (free)
   type ModalState = 'none' | 'info_form' | 'payment_picker' | 'preview'
   const [modal, setModal] = useState<ModalState>('none')
   const [studentData, setStudentData] = useState<{ name: string; email: string; phone: string; city: string } | null>(null)
@@ -514,11 +551,9 @@ export default function CoursePage() {
     setModal('info_form')
   }
 
-  // Called when student finishes the info form
   async function handleInfoSubmit(data: { name: string; email: string; phone: string; city: string }) {
     setStudentData(data)
     if (course?.is_free) {
-      // Free course — enroll immediately
       setEnrollLoading(true)
       try {
         const result = await enrollFree(course.id, data)
@@ -537,7 +572,6 @@ export default function CoursePage() {
         setEnrollLoading(false)
       }
     } else {
-      // Paid course — go to payment picker
       setModal('payment_picker')
     }
   }
@@ -608,8 +642,6 @@ export default function CoursePage() {
 
   return (
     <main className="min-h-screen bg-[#F8F9FF]">
-
-      {/* ── Hero ── */}
       <div className="bg-[#0F1F3D] pt-24 pb-16 px-6">
         <div className="max-w-7xl mx-auto grid md:grid-cols-[1fr_380px] gap-12 items-start">
           <div>
@@ -626,8 +658,6 @@ export default function CoursePage() {
               <span>📜 Certificate included</span>
               {freeLessonCount > 0 && !enrolled && <span className="text-emerald-400">✦ {freeLessonCount} free preview{freeLessonCount > 1 ? 's' : ''}</span>}
             </div>
-
-            {/* What you'll learn */}
             {sections.length > 0 && (
               <div className="mt-8 p-5 rounded-xl border border-white/10 bg-white/5">
                 <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">What you'll learn</p>
@@ -641,20 +671,16 @@ export default function CoursePage() {
                 </div>
               </div>
             )}
-
-            {/* Related blog link */}
             {course.related_blog_url && (
               <div className="mt-5">
                 <a href={course.related_blog_url} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm text-[#93C5FD] hover:text-white transition-colors">
-                  <span>📖</span>
-                  <span>Read more about this topic on our blog →</span>
+                  <span>📖</span><span>Read more about this topic on our blog →</span>
                 </a>
               </div>
             )}
           </div>
 
-          {/* ── Enrollment Card ── */}
           <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-black/20 sticky top-24">
             <div className="aspect-video bg-gradient-to-br from-[#2563EB]/10 to-[#93C5FD]/20 rounded-xl mb-6 flex items-center justify-center overflow-hidden">
               {course.thumbnail_url ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover rounded-xl" /> : <span className="text-[#2563EB] text-4xl">▶</span>}
@@ -686,14 +712,12 @@ export default function CoursePage() {
         </div>
       </div>
 
-      {/* ── Curriculum ── */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="max-w-3xl">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-[#0F1F3D]">Course Curriculum</h2>
             {!enrolled && freeLessonCount > 0 && <span className="text-sm text-[#64748B]">{freeLessonCount} free preview{freeLessonCount !== 1 ? 's' : ''}</span>}
           </div>
-
           {sections.length > 0 ? (
             <div className="mb-12">
               {sections.map((s, i) => <SyllabusSection key={s.id} section={s} index={i} enrolled={enrolled} onLessonClick={handleLessonClick} />)}
@@ -741,7 +765,6 @@ export default function CoursePage() {
         </div>
       </div>
 
-      {/* ── Free Preview Modal ── */}
       {modal === 'preview' && previewLesson && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setModal('none')}>
           <div className="bg-[#0A1628] rounded-2xl overflow-hidden w-full max-w-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -785,26 +808,16 @@ export default function CoursePage() {
         </div>
       )}
 
-      {/* ── Info Form Modal ── */}
       {modal === 'info_form' && course && user && (
-        <StudentInfoForm
-          user={user}
-          courseTitle={course.title}
-          isFree={course.is_free}
-          onClose={() => setModal('none')}
-          onNext={handleInfoSubmit}
-        />
+        <StudentInfoForm user={user} courseTitle={course.title} isFree={course.is_free}
+          onClose={() => setModal('none')} onNext={handleInfoSubmit} />
       )}
 
-      {/* ── Payment Picker ── */}
       {modal === 'payment_picker' && course && user && studentData && (
-        <PaymentPicker
-          course={course}
-          studentData={studentData}
+        <PaymentPicker course={course} studentData={studentData}
           onClose={() => { setModal('none'); setStudentData(null) }}
           onBack={() => setModal('info_form')}
-          onLocalSuccess={() => setModal('none')}
-        />
+          onLocalSuccess={() => setModal('none')} />
       )}
     </main>
   )
