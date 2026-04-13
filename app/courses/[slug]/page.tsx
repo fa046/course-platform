@@ -607,6 +607,19 @@ export default function CoursePage() {
     )
   }
 
+  const BUNNY_PULL_ZONE = process.env.NEXT_PUBLIC_BUNNY_PULL_ZONE || 'https://smartlearn.b-cdn.net'
+
+function getFullImageUrl(path: string | null): string | null {
+  if (!path) return null
+  if (path.startsWith('http')) {
+    if (path.includes('.storage.bunnycdn.com')) {
+      const match = path.match(/\.storage\.bunnycdn\.com\/[^/]+\/(.+)/)
+      return match ? `${BUNNY_PULL_ZONE}/${match[1]}` : path
+    }
+    return path
+  }
+  return `${BUNNY_PULL_ZONE}/${path.replace(/^\//, '')}`
+}
   const totalLessons = course.lessons?.length || 0
   const totalDuration = course.lessons?.reduce((a, l) => a + (l.duration_seconds || 0), 0) || 0
   const hours = Math.floor(totalDuration / 3600)
