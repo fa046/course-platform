@@ -683,7 +683,7 @@ export default function CoursePage() {
 
           <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-black/20 sticky top-24">
             <div className="aspect-video bg-gradient-to-br from-[#2563EB]/10 to-[#93C5FD]/20 rounded-xl mb-6 flex items-center justify-center overflow-hidden">
-              {course.thumbnail_url ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover rounded-xl" /> : <span className="text-[#2563EB] text-4xl">▶</span>}
+             {getFullImageUrl(course.thumbnail_url) ? <img src={getFullImageUrl(course.thumbnail_url)!} alt={course.title} className="w-full h-full object-cover rounded-xl" /> : <span className="text-[#2563EB] text-4xl">▶</span>}
             </div>
             {course.is_free
               ? <div className="mb-4"><span className="text-3xl font-bold text-emerald-600">Free</span></div>
