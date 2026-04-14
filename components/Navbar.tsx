@@ -20,7 +20,7 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center">
             <span className="text-white font-bold text-sm">L</span>
           </div>
-          <span className="font-semibold text-lg tracking-tight text-[#0F1F3D]">LearnSmart</span>
+          <span className="font-semibold text-lg tracking-tight text-[#0F1F3D]">SmartSkillify</span>
         </Link>
 
         {/* Nav Links */}
