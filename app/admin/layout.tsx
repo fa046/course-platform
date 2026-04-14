@@ -23,6 +23,7 @@ export default async function AdminLayout({
 }) {
   const { userId } = await auth();
 
+  // ✅ Supabase role check (NOT env anymore)
   if (!(await isAdmin(userId))) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-900">
