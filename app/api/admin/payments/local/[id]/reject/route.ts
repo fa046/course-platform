@@ -4,19 +4,53 @@ import { NextResponse } from 'next/server'
 
 type Params = { params: Promise<{ id: string }> }
 
+async function isAdmin(userId: string | null) {
+  if (!userId) return false
+
+  const supabase = createAdminClient()
+
+  const { data } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .single()
+
+  return data?.role === 'admin'
+}
+
 export async function POST(request: Request, { params }: Params) {
   const { userId } = await auth()
-  if (!userId || userId !== process.env.ADMIN_USER_ID) {
+
+  // 🔐 Supabase role check
+  if (!(await isAdmin(userId))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
   const { id } = await params
   const { admin_note } = await request.json()
-  if (!admin_note?.trim()) return NextResponse.json({ error: 'Rejection reason required' }, { status: 400 })
+
+  if (!admin_note?.trim()) {
+    return NextResponse.json(
+      { error: 'Rejection reason required' },
+      { status: 400 }
+    )
+  }
+
   const supabase = createAdminClient()
-  const { error } = await supabase.from('local_payments').update({
-    status: 'rejected', admin_note,
-    reviewed_at: new Date().toISOString(), reviewed_by: userId,
-  }).eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const { error } = await supabase
+    .from('local_payments')
+    .update({
+      status: 'rejected',
+      admin_note,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: userId,
+    })
+    .eq('id', id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
   return NextResponse.json({ success: true })
 }
