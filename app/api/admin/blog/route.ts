@@ -2,12 +2,18 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
-async function isAdmin(userId: string) {
+async function isAdmin(userId: string | null) {
+  if (!userId) return false
+
+  const supabase = getSupabase()
+
   const { data } = await supabase
     .from('users')
     .select('role')
@@ -17,35 +23,53 @@ async function isAdmin(userId: string) {
   return data?.role === 'admin'
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   const { userId } = await auth()
 
-  if (!userId || !(await isAdmin(userId))) {
+  if (!(await isAdmin(userId))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('blog_posts')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
   return NextResponse.json({ posts: data || [] })
 }
 
 export async function POST(request: Request) {
   const { userId } = await auth()
 
-  if (!userId || !(await isAdmin(userId))) {
+  if (!(await isAdmin(userId))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const body = await request.json()
-  const { title, slug, content, excerpt, thumbnail_url, is_published, category, tags, read_time, author_name } = body
+  const {
+    title,
+    slug,
+    content,
+    excerpt,
+    thumbnail_url,
+    is_published,
+    category,
+    tags,
+    read_time,
+    author_name
+  } = body
 
   if (!title || !slug) {
     return NextResponse.json({ error: 'Title and slug are required' }, { status: 400 })
   }
+
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('blog_posts')
@@ -66,7 +90,9 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ post: data })
-}s
+}
