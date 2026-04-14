@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -9,7 +10,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/courses(.*)',
   '/api/payments(.*)',
-  '/api/webhooks(.*)',  // Clerk + future webhooks (Safepay, Paddle)
+  '/api/webhooks(.*)',
 ])
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin(.*)'])
@@ -17,9 +18,28 @@ const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin(.*)'])
 export default clerkMiddleware(async (auth, request) => {
   if (isAdminRoute(request)) {
     const { userId } = await auth()
-    if (!userId || userId !== process.env.ADMIN_USER_ID) {
+
+    if (!userId) {
+      return NextResponse.redirect(new URL('/sign-in', request.url))
+    }
+
+    // Sirf Supabase se check karo
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    const { data: user } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single()
+
+    if (!user || user.role !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url))
     }
+
     return
   }
 
