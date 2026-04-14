@@ -1,35 +1,34 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isAdmin } from '@/lib/isAdmin'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
-async function isAdmin(userId: string | null) {
-  if (!userId) return false
-
-  const { data } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', userId)
-    .single()
-
-  return data?.role === 'admin'
+async function requireAdmin() {
+  const { userId } = await auth()
+  if (!(await isAdmin(userId))) {
+    return null
+  }
+  return userId
 }
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-
-  if (!(await isAdmin(userId))) {
+  const userId = await requireAdmin()
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { id } = await params
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('blog_posts')
@@ -48,14 +47,15 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-
-  if (!(await isAdmin(userId))) {
+  const userId = await requireAdmin()
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { id } = await params
   const body = await request.json()
+
+  const supabase = getSupabase()
 
   const {
     title,
@@ -99,13 +99,13 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-
-  if (!(await isAdmin(userId))) {
+  const userId = await requireAdmin()
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { id } = await params
+  const supabase = getSupabase()
 
   const { error } = await supabase
     .from('blog_posts')
