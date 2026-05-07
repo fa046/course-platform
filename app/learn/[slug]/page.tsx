@@ -162,13 +162,15 @@ export default function LearnPage() {
     finally { setLoading(false) }
   }
 
+  // ── Admin bypass: if API says enrolled (incl. admin), allow through ──────────
   async function checkEnrollment() {
     try {
       const res = await fetch(`/api/courses/${slug}/enrollment`)
       const data = await res.json()
-      if (!data.enrolled) router.push(`/courses/${slug}`)
+      if (!data.enrolled && !data.isAdmin) router.push(`/courses/${slug}`)
     } catch { router.push(`/courses/${slug}`) }
   }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   async function loadProgress() {
     if (!course?.lessons) return

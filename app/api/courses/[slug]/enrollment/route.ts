@@ -12,8 +12,21 @@ export async function GET(
       return NextResponse.json({ enrolled: false })
     }
 
-    const { slug } = await params
     const supabase = await createClient()
+
+    // ── Admin bypass ──────────────────────────────────────────────────────────
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single()
+
+    if (profile?.role === 'admin') {
+      return NextResponse.json({ enrolled: true, isAdmin: true })
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const { slug } = await params
 
     const { data: course } = await supabase
       .from('courses')
