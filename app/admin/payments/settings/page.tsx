@@ -15,7 +15,7 @@ type PaymentSetting = {
 const METHOD_LABELS: Record<string, { title: string; emoji: string }> = {
   jazzcash: { title: 'JazzCash', emoji: '💜' },
   easypaisa: { title: 'Easypaisa', emoji: '💚' },
-  bank_transfer: { title: 'Bank Transfer', emoji: '🏦' },
+  bank_transfer: { title: 'Bank Transfer (International and Local)', emoji: '🏦' },
 }
 
 export default function PaymentSettingsPage() {

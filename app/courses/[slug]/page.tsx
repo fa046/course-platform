@@ -234,7 +234,7 @@ type PaymentSetting = {
 const METHOD_META: Record<string, { title: string; note: string; emoji: string }> = {
   jazzcash: { title: 'JazzCash', note: 'Send via JazzCash Mobile Account', emoji: '💜' },
   easypaisa: { title: 'Easypaisa', note: 'Send via Easypaisa Mobile Account or OTC', emoji: '💚' },
-  bank_transfer: { title: 'Bank Transfer', note: 'Transfer via bank', emoji: '🏦' },
+  bank_transfer: { title: 'Bank Transfer (International and Local)', note: 'Transfer via bank', emoji: '🏦' },
 }
 
 function LocalPaymentFlow({ course, studentData, onClose, onBack, onSuccess }: {

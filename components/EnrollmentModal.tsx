@@ -294,7 +294,7 @@ export default function EnrollmentModal({ course, user, onClose, onSuccess, init
                     <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-sm font-bold text-green-700">PK</div>
                     <div>
                       <span className="block font-bold text-sm">Pay in PKR</span>
-                      <span className="text-xs text-gray-500">JazzCash · Easypaisa · Bank Transfer</span>
+                      <span className="text-xs text-gray-500">JazzCash · Easypaisa · Bank Transfer (International and Local)</span>
                       <span className="block text-xs font-semibold text-[#0F1F3D] mt-0.5">Rs. {course.price_pkr.toLocaleString()}</span>
                     </div>
                   </div>

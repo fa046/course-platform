@@ -109,7 +109,7 @@ export async function sendLocalPaymentReceived({
   const methodLabel =
     paymentMethod === 'jazzcash' ? 'JazzCash' :
     paymentMethod === 'easypaisa' ? 'Easypaisa' :
-    'Bank Transfer';
+    'Bank Transfer (International and Local)';
 
   await resend.emails.send({
     from: FROM,

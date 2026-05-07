@@ -69,7 +69,7 @@ export default function LocalPaymentsPage() {
   }[s] ?? 'bg-gray-100 text-gray-600')
 
   const methodLabel = (m: string) => ({
-    jazzcash: 'JazzCash', easypaisa: 'Easypaisa', bank_transfer: 'Bank Transfer'
+    jazzcash: 'JazzCash', easypaisa: 'Easypaisa', bank_transfer: 'Bank Transfer (International and Local)'
   }[m] ?? m)
 
   const pendingCount = payments.filter(p => p.status === 'pending').length
