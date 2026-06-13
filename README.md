@@ -1,6 +1,6 @@
 # SmartSkillify
 
-A full-stack online course platform built for a client, aimed at Pakistani students. Students can browse, enroll in, and complete courses with video lessons and progress tracking. Admins manage everything from a single dashboard.
+A full-stack online course platform aimed at students. Students can browse, enroll in and complete courses with video lessons and progress tracking. Admins manage everything from a single dashboard.
 
 🔗 **Live:** [smartskillify.com](https://www.smartskillify.com)
 
