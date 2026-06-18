@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { ClerkProvider } from '@clerk/nextjs'
+import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 
@@ -48,6 +49,7 @@ export default function RootLayout({
         <body className="bg-[#F8F9FF] antialiased">
           {!isAdminPage && <Navbar />}
           {children}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>
