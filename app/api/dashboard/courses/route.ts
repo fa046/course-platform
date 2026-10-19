@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
@@ -9,7 +9,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: enrollments, error } = await supabase
       .from('enrollments')
@@ -23,6 +23,7 @@ export async function GET() {
 
     return NextResponse.json({ courses })
   } catch (error) {
+    console.error('Dashboard course query failed:', error)
     return NextResponse.json({ error: 'Failed to fetch courses' }, { status: 500 })
   }
 }

@@ -39,9 +39,17 @@ export default function LocalPaymentsPage() {
   const filtered = payments.filter(p => filter === 'all' ? true : p.status === filter)
 
   const handleApprove = async (id: string) => {
-    if (!confirm('Approve this payment and enroll the student?')) return
+    const isRetry = selected?.status === 'approved'
+    if (!confirm(isRetry ? 'Retry enrollment for this approved payment?' : 'Approve this payment and enroll the student?')) return
     setProcessing(true)
-    await fetch(`/api/admin/payments/local/${id}/approve`, { method: 'POST' })
+    const response = await fetch(`/api/admin/payments/local/${id}/approve`, { method: 'POST' })
+    const result = await response.json()
+    if (!response.ok) {
+      alert(result.error ?? 'Unable to enroll the student')
+      await fetchPayments()
+      setProcessing(false)
+      return
+    }
     await fetchPayments()
     setSelected(null)
     setProcessing(false)
@@ -211,9 +219,14 @@ export default function LocalPaymentsPage() {
             </div>
 
             {/* Actions */}
-            {selected.status === 'pending' && (
+            {(selected.status === 'pending' || selected.status === 'approved') && (
               <div className="p-6 border-t border-gray-100 space-y-3">
-                {!showRejectInput ? (
+                {selected.status === 'approved' ? (
+                  <button onClick={() => handleApprove(selected.id)} disabled={processing}
+                    className="w-full bg-green-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60">
+                    {processing ? 'Processing...' : 'Retry Enrollment'}
+                  </button>
+                ) : !showRejectInput ? (
                   <div className="flex gap-3">
                     <button onClick={() => setShowRejectInput(true)}
                       className="flex-1 border border-red-200 text-red-600 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors">

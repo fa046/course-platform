@@ -39,18 +39,9 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
   }
 
-  if (payment.status !== 'pending') {
+  if (payment.status !== 'pending' && payment.status !== 'approved') {
     return NextResponse.json({ error: 'Already processed' }, { status: 400 })
   }
-
-  await supabase
-    .from('local_payments')
-    .update({
-      status: 'approved',
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: userId,
-    })
-    .eq('id', id)
 
   const { error: enrollError } = await supabase
     .from('enrollments')
@@ -70,13 +61,28 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: enrollError.message }, { status: 500 })
   }
 
+  if (payment.status === 'pending') {
+    const { error: approveError } = await supabase
+      .from('local_payments')
+      .update({
+        status: 'approved',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: userId,
+      })
+      .eq('id', id)
+
+    if (approveError) {
+      return NextResponse.json({ error: approveError.message }, { status: 500 })
+    }
+  }
+
   // 📧 Send email (non-critical)
   try {
     const userEmail = payment.users?.email
     const courseTitle = payment.courses?.title
     const courseSlug = payment.courses?.slug
 
-    if (userEmail && courseTitle && courseSlug) {
+    if (payment.status === 'pending' && userEmail && courseTitle && courseSlug) {
       await sendEnrollmentConfirmation({
         to: userEmail,
         studentName: payment.student_name || 'there',
