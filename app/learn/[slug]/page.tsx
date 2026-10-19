@@ -123,12 +123,19 @@ export default function LearnPage() {
 
   const [course, setCourse] = useState<Course | null>(null)
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null)
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>('idle')
   const [progressMap, setProgressMap] = useState<Record<string, LessonProgress>>({})
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [livePercent, setLivePercent] = useState(0)
   const savingRef = useRef(false)
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  function getLessonHref(lessonId: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('lesson', lessonId)
+    return `/learn/${encodeURIComponent(String(slug))}?${params.toString()}`
+  }
 
   useEffect(() => { if (slug) fetchCourse() }, [slug])
   useEffect(() => { if (user && course) checkEnrollment() }, [user, course])
@@ -155,7 +162,11 @@ export default function LearnPage() {
         const lessons = data.course.lessons || []
         if (lessons.length > 0) {
           const target = initialLessonId ? lessons.find((l: Lesson) => l.id === initialLessonId) : null
-          setActiveLesson(target || lessons[0])
+          const selectedLesson = target || lessons[0]
+          setActiveLesson(selectedLesson)
+          if (initialLessonId !== selectedLesson.id) {
+            router.replace(getLessonHref(selectedLesson.id), { scroll: false })
+          }
         }
       }
     } catch (e) { console.error(e) }
@@ -229,7 +240,22 @@ export default function LearnPage() {
   function selectLesson(lesson: Lesson) {
     setActiveLesson(lesson)
     setLivePercent(progressMap[lesson.id]?.watch_percent ?? 0)
+    setShareStatus('idle')
+    router.replace(getLessonHref(lesson.id), { scroll: false })
     if (window.innerWidth < 768) setSidebarOpen(false)
+  }
+
+  async function shareActiveLesson() {
+    if (!activeLesson) return
+
+    try {
+      const url = new URL(getLessonHref(activeLesson.id), window.location.origin)
+      await navigator.clipboard.writeText(url.toString())
+      setShareStatus('copied')
+    } catch (error) {
+      console.error('Failed to copy lesson link:', error)
+      setShareStatus('error')
+    }
   }
 
   const totalLessons = course?.lessons?.length || 0
@@ -345,12 +371,34 @@ export default function LearnPage() {
                     </div>
                     <h2 className="text-white text-lg font-semibold leading-snug">{activeLesson.title}</h2>
                   </div>
-                  {isVideo && !activeLessonProgress?.is_completed && (
-                    <button onClick={handleComplete}
-                      className="flex-shrink-0 text-xs text-white/25 hover:text-emerald-400 transition-colors border border-white/8 hover:border-emerald-500/30 px-3 py-1.5 rounded-lg">
-                      Mark complete
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={shareActiveLesson}
+                      className={`flex items-center gap-1.5 text-xs transition-colors border px-3 py-1.5 rounded-lg ${
+                        shareStatus === 'copied'
+                          ? 'text-emerald-400 border-emerald-500/30'
+                          : shareStatus === 'error'
+                            ? 'text-red-400 border-red-500/30'
+                            : 'text-white/35 border-white/8 hover:text-white/70 hover:border-white/20'
+                      }`}
+                      title={shareStatus === 'error' ? 'Could not copy link. Try again.' : 'Copy lesson link'}
+                      aria-live="polite">
+                      {shareStatus === 'copied' ? '✓ Link copied' : shareStatus === 'error' ? 'Copy failed' : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                            <path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4" />
+                          </svg>
+                          Share
+                        </>
+                      )}
                     </button>
-                  )}
+                    {isVideo && !activeLessonProgress?.is_completed && (
+                      <button onClick={handleComplete}
+                        className="flex-shrink-0 text-xs text-white/25 hover:text-emerald-400 transition-colors border border-white/8 hover:border-emerald-500/30 px-3 py-1.5 rounded-lg">
+                        Mark complete
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {isVideo && livePercent > 0 && !activeLessonProgress?.is_completed && (
@@ -393,7 +441,7 @@ export default function LearnPage() {
                   <div className="mt-5 p-6 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-600/10 border border-emerald-500/20 text-center">
                     <div className="text-4xl mb-3">🎉</div>
                     <p className="text-emerald-300 font-semibold text-lg mb-1">Course Complete!</p>
-                    <p className="text-white/30 text-sm mb-4">You've finished every lesson.</p>
+                    <p className="text-white/30 text-sm mb-4">You&apos;ve finished every lesson.</p>
                     <a href={`/certificate/${slug}`}
                       className="inline-flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-5 py-2.5 rounded-xl text-sm font-medium transition-all">
                       🎓 Get Your Certificate →

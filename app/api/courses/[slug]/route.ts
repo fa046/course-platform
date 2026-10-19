@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { auth } from '@clerk/nextjs/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -7,13 +9,36 @@ export async function GET(
 ) {
   try {
     const { slug } = await params
-    const supabase = await createClient()
+    const { userId } = await auth()
+    let supabase = await createClient()
+    let isAdmin = false
 
-    const { data: course, error } = await supabase
+    if (userId) {
+      const adminClient = createAdminClient()
+      const { data: user, error: userError } = await adminClient
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (userError) throw userError
+      isAdmin = user?.role === 'admin'
+
+      if (isAdmin) {
+        supabase = adminClient
+      }
+    }
+
+    let courseQuery = supabase
       .from('courses')
       .select('*, lessons(*)')
       .eq('slug', slug)
-      .eq('is_published', true)
+
+    if (!isAdmin) {
+      courseQuery = courseQuery.eq('is_published', true)
+    }
+
+    const { data: course, error } = await courseQuery
       .order('position', { referencedTable: 'lessons', ascending: true })
       .single()
 
